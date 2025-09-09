@@ -25,6 +25,10 @@
 
         <form method="POST" action="{{ route('beneficiario.store') }}" class="space-y-4">
             @csrf
+            
+            <!-- 👇 Aquí va el input hidden con el formulario_id -->
+            <input type="hidden" name="formulario_id" value="{{ $formulario->id ?? '' }}">
+
             <div>
                 <label>RUT</label>
                 <input type="text" name="rut" class="w-full border rounded p-2">
@@ -47,8 +51,11 @@
                 </select>
             </div>
 
-            <button type="submit" class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">Registrar Beneficiario</button>
+            <button type="submit" class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">
+                Registrar Beneficiario
+            </button>
         </form>
+
     </div>
 
     <!-- Lista de Beneficiarios Recientes -->
