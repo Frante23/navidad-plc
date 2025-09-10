@@ -19,7 +19,19 @@ class Beneficiario extends Model
         'direccion',
         'formulario_id',
         'organizacion_id',
+        'tramo_id',
     ];
+
+    public function getRutFormateadoAttribute()
+    {
+        $rut = $this->rut;
+        $dv = substr($rut, -1);
+        $num = substr($rut, 0, -1);
+
+        $num = intval($num);
+
+        return number_format($num, 0, '', '.') . '-' . strtoupper($dv);
+    }
 
     public function formulario()
     {
@@ -31,7 +43,6 @@ class Beneficiario extends Model
         return $this->belongsTo(Organizacion::class, 'organizacion_id');
     }
 
-    // Edad calculada
     public function getEdadAttribute()
     {
         return \Carbon\Carbon::parse($this->fecha_nacimiento)->age;

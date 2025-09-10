@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <title>Login Organización</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('css/login.css') }}">
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
-
-    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
-        <h2 class="text-2xl font-bold text-center mb-6">Inicio de Sesión - Organización</h2>
+    <div class="bg-white p-8 rounded-b-lg shadow-lg w-full max-w-md">
+        <h2 class="text-2xl font-bold text-center mb-6">Inicio de Sesión de Organizaciones</h2>
 
         @if ($errors->any())
             <div class="bg-red-100 text-red-600 p-2 rounded mb-4">
@@ -16,11 +16,24 @@
             </div>
         @endif
 
+        @if(session('cerrado'))
+            <div class="max-w-lg mx-auto mb-6">
+                <div class="bg-red-500 text-white text-center p-4 rounded-xl shadow-lg">
+                    <h2 class="text-lg font-bold">Inscripción cerrada</h2>
+                    <p class="mt-2 text-sm">{{ session('cerrado') }}</p>
+                </div>
+            </div>
+        @endif
+
+
+
+
+
         <form method="POST" action="{{ route('organizacion.login.post') }}" class="space-y-4">
             @csrf
             <div>
-                <label for="email" class="block text-gray-700">Correo</label>
-                <input type="email" name="email" id="email" class="w-full border rounded p-2" required>
+                <label for="personalidad_juridica" class="block text-gray-700">Personalidad Jurídica</label>
+                <input type="text" name="personalidad_juridica" id="personalidad_juridica" class="w-full border rounded p-2" required>
             </div>
             <div>
                 <label for="clave" class="block text-gray-700">Contraseña</label>
@@ -37,6 +50,5 @@
             </a>
         </div>
     </div>
-
 </body>
 </html>

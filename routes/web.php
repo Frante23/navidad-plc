@@ -24,3 +24,15 @@ Route::post('/beneficiario/registrar', [OrganizacionController::class, 'storeBen
 Route::get('/login/funcionarios', function () {
     return redirect()->route('formulario');
 })->name('login.funcionarios');
+
+
+Route::post('/organizacion/cerrar', [OrganizacionController::class, 'cerrar'])
+    ->name('organizacion.cerrar');
+
+
+
+Route::get('/organizacion/login', [OrganizacionController::class, 'showLoginForm'])
+    ->name('organizacion.login.form');
+
+Route::post('/organizacion/login', [OrganizacionController::class, 'login'])
+    ->name('organizacion.login.post');
