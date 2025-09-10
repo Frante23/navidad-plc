@@ -20,26 +20,26 @@
     @endif
 
     <!-- Formulario Beneficiario -->
+    <!-- Formulario Beneficiario -->
     <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg">
         <h2 class="text-2xl font-bold mb-6 text-center">Registrar Beneficiario</h2>
 
         <form method="POST" action="{{ route('beneficiario.store') }}" class="space-y-4">
             @csrf
             
-            <!-- 👇 Aquí va el input hidden con el formulario_id -->
             <input type="hidden" name="formulario_id" value="{{ $formulario->id ?? '' }}">
 
             <div>
                 <label>RUT</label>
-                <input type="text" name="rut" class="w-full border rounded p-2">
+                <input type="text" name="rut" class="w-full border rounded p-2" required>
             </div>
             <div>
                 <label>Nombre completo</label>
-                <input type="text" name="nombre_completo" class="w-full border rounded p-2">
+                <input type="text" name="nombre_completo" class="w-full border rounded p-2" required>
             </div>
             <div>
                 <label>Fecha de nacimiento</label>
-                <input type="date" name="fecha_nacimiento" class="w-full border rounded p-2">
+                <input type="date" name="fecha_nacimiento" class="w-full border rounded p-2" required>
             </div>
             <div>
                 <label>Sexo</label>
@@ -47,28 +47,54 @@
                     <option value="">Selecciona</option>
                     <option value="M">Masculino</option>
                     <option value="F">Femenino</option>
-                    <option value="U">Unisex</option>
+                    <option value="U">Unisex (0 a 11 meses)</option>
                 </select>
+            </div>
+            <div>
+                <label>Dirección</label>
+                <input type="text" name="direccion" class="w-full border rounded p-2" required>
             </div>
 
             <button type="submit" class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">
                 Registrar Beneficiario
             </button>
         </form>
-
     </div>
 
-    <!-- Lista de Beneficiarios Recientes -->
-    <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg">
-        <h2 class="text-xl font-bold mb-4">Beneficiarios Recientes</h2>
-        <ul class="divide-y divide-gray-200" id="beneficiariosRecientes">
-            @forelse($beneficiarios as $b)
-                <li class="py-2">{{ $b->nombre_completo }} ({{ $b->rut }}) - Formulario ID: {{ $b->formulario_id }}</li>
-            @empty
-                <li class="py-2 text-gray-400">No hay beneficiarios registrados aún.</li>
-            @endforelse
-        </ul>
+    <!-- Lista de Beneficiarios Registrados -->
+    <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-4xl">
+        <h2 class="text-xl font-bold mb-4">Beneficiarios Registrados</h2>
+
+        @if($beneficiarios->isEmpty())
+            <p class="text-gray-600">No hay beneficiarios registrados aún.</p>
+        @else
+            <table class="min-w-full bg-white border border-gray-300 rounded-lg shadow">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="px-4 py-2 border">Folio (ID)</th>
+                        <th class="px-4 py-2 border">Nombre Completo</th>
+                        <th class="px-4 py-2 border">Fecha Nac.</th>
+                        <th class="px-4 py-2 border">Edad</th>
+                        <th class="px-4 py-2 border">RUT</th>
+                        <th class="px-4 py-2 border">Dirección</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($beneficiarios as $ben)
+                        <tr>
+                            <td class="px-4 py-2 border">{{ $ben->id }}</td>
+                            <td class="px-4 py-2 border">{{ $ben->nombre_completo }}</td>
+                            <td class="px-4 py-2 border">{{ $ben->fecha_nacimiento }}</td>
+                            <td class="px-4 py-2 border">{{ $ben->edad }}</td>
+                            <td class="px-4 py-2 border">{{ $ben->rut }}</td>
+                            <td class="px-4 py-2 border">{{ $ben->direccion }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
     </div>
+
 
 
 </main>

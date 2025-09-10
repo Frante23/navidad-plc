@@ -19,6 +19,7 @@ Route::get('/formulario', [OrganizacionController::class, 'showForm'])
 Route::post('/beneficiario/registrar', [OrganizacionController::class, 'storeBeneficiario'])
     ->name('beneficiario.store');
 
+
 // Cualquier intento de login de funcionarios redirige al formulario de organizaciones
 Route::get('/login/funcionarios', function () {
     return redirect()->route('formulario');

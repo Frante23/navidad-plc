@@ -8,9 +8,8 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col">
 
-    <!-- Barra superior -->
     <header class="w-full bg-blue-600 text-white p-4 flex justify-between items-center shadow">
-        <h1 class="text-xl font-bold">Sistema de Registro de Navidad - Ilustre Municipalidad de Padre las Casas</h1>
+        <h1 class="text-xl font-bold">Formulario de registro de Navidad - Ilustre Municipalidad de Padre las Casas</h1>
     </header>
 
     <!-- Contenido principal -->
