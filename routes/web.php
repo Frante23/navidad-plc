@@ -36,3 +36,8 @@ Route::get('/organizacion/login', [OrganizacionController::class, 'showLoginForm
 
 Route::post('/organizacion/login', [OrganizacionController::class, 'login'])
     ->name('organizacion.login.post');
+
+
+Route::get('/beneficiario/{id}/edit', [OrganizacionController::class, 'edit'])->name('beneficiario.edit');
+Route::put('/beneficiario/{id}', [OrganizacionController::class, 'update'])->name('beneficiario.update');
+Route::delete('/beneficiario/{id}', [OrganizacionController::class, 'destroy'])->name('beneficiario.destroy');

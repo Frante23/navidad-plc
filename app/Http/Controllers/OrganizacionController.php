@@ -179,4 +179,57 @@ class OrganizacionController extends Controller
         return $this->belongsTo(TramoEdad::class, 'tramo_id');
     }
 
+
+
+
+
+    public function edit($id)
+    {
+        $beneficiario = Beneficiario::findOrFail($id);
+
+        if ($beneficiario->organizacion_id !== session('organizacion_id')) {
+            abort(403, 'No autorizado');
+        }
+
+        return view('organizaciones.edit-beneficiario', compact('beneficiario'));
+    }
+
+    public function update(Request $request, $id)
+    {
+        $beneficiario = Beneficiario::findOrFail($id);
+
+        if ($beneficiario->organizacion_id !== session('organizacion_id')) {
+            abort(403, 'No autorizado');
+        }
+
+        $request->validate([
+            'nombre_completo' => 'required',
+            'fecha_nacimiento' => 'required|date',
+            'sexo' => 'nullable|in:M,F,U',
+            'direccion' => 'required',
+        ]);
+
+        $beneficiario->update($request->only([
+            'nombre_completo', 'fecha_nacimiento', 'sexo', 'direccion'
+        ]));
+
+        return redirect()->route('formulario')->with('success_ben', 'Beneficiario actualizado correctamente.');
+    }
+
+    public function destroy($id)
+    {
+        $beneficiario = Beneficiario::findOrFail($id);
+
+        if ($beneficiario->organizacion_id !== session('organizacion_id')) {
+            abort(403, 'No autorizado');
+        }
+
+        $beneficiario->delete();
+
+        return redirect()->route('formulario')->with('success_ben', 'Beneficiario eliminado correctamente.');
+    }
+
 }
+
+
+

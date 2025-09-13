@@ -33,7 +33,6 @@
     </script>
 
 
-    <!-- Mensaje de éxito -->
     @if(session('success_ben'))
         <div class="bg-green-100 text-green-800 p-4 rounded w-full max-w-lg">{{ session('success_ben') }}</div>
     @endif
@@ -46,7 +45,7 @@
         @if(session('status'))
         <div class="max-w-lg mx-auto mb-6">
             <div class="bg-gradient-to-r from-red-500 to-pink-500 text-white text-center p-4 rounded-xl shadow-lg animate-bounce">
-                <h2 class="text-xl font-bold mb-2">🚨 Inscripción cerrada 🚨</h2>
+                <h2 class="text-xl font-bold mb-2">Inscripción cerrada</h2>
                 <p class="text-sm">{{ session('status') }}</p>
                 <p class="mt-2 text-xs opacity-90">Si necesita volver a habilitar su acceso, contacte a la Municipalidad.</p>
             </div>
@@ -108,7 +107,6 @@
         </form>
     </div>
 
-    <!-- Botón para cerrar inscripción -->
 <div class="mt-6 w-full max-w-lg">
     <button 
         type="button" 
@@ -170,6 +168,7 @@
                         <th class="px-4 py-2 border">Edad</th>
                         <th class="px-4 py-2 border">RUT</th>
                         <th class="px-4 py-2 border">Dirección</th>
+                        <th class="px-4 py-2 border">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -181,6 +180,28 @@
                             <td class="px-4 py-2 border">{{ $ben->edad }}</td>
                             <td class="px-4 py-2 border">{{ $ben->rut_formateado }}</td>
                             <td class="px-4 py-2 border">{{ $ben->direccion }}</td>
+                            <td class="px-4 py-2 border text-center">
+                                @if($formulario->estado === 'abierto')
+                                    <a href="{{ route('beneficiario.edit', $ben->id) }}" 
+                                    class="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600">
+                                        Editar
+                                    </a>
+                                    <form action="{{ route('beneficiario.destroy', $ben->id) }}" 
+                                        method="POST" 
+                                        class="inline" 
+                                        onsubmit="return confirm('¿Estás seguro de eliminar este beneficiario?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="button" 
+                                                onclick="abrirModalEliminar({{ $ben->id }}, '{{ $ben->nombre_completo }}')" 
+                                                class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">
+                                            Eliminar
+                                        </button>
+                                    </form>
+                                @else
+                                    <span class="text-gray-400">Cerrado</span>
+                                @endif
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -188,6 +209,44 @@
         @endif
     </div>
 
+<div id="modalEliminar" class="fixed inset-0 bg-black bg-opacity-50 hidden justify-center items-center">
+    <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md text-center">
+        <h2 class="text-xl font-bold text-red-600 mb-4">Confirmar Eliminación</h2>
+        <p class="text-gray-700 mb-6">
+            ¿Seguro que deseas eliminar a<br>
+            <span id="nombreBeneficiario" class="font-semibold"></span>?
+        </p>
+
+        <form id="formEliminar" method="POST">
+            @csrf
+            @method('DELETE')
+            <div class="flex justify-between">
+                <button type="button" onclick="cerrarModalEliminar()" 
+                        class="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400 transition">
+                    Cancelar
+                </button>
+                <button type="submit" 
+                        class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">
+                    Sí, eliminar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function abrirModalEliminar(id, nombre) {
+        document.getElementById("nombreBeneficiario").innerText = nombre;
+        document.getElementById("formEliminar").action = "/beneficiario/" + id;
+        document.getElementById("modalEliminar").classList.remove("hidden");
+        document.getElementById("modalEliminar").classList.add("flex");
+    }
+
+    function cerrarModalEliminar() {
+        document.getElementById("modalEliminar").classList.remove("flex");
+        document.getElementById("modalEliminar").classList.add("hidden");
+    }
+</script>
 
 
 </main>
