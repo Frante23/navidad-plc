@@ -21,7 +21,7 @@ class Formulario extends Model
 
     public function periodo()
     {
-        return $this->belongsTo(Periodo::class);
+        return $this->belongsTo(\App\Models\Periodo::class);
     }
 
     public function beneficiarios()

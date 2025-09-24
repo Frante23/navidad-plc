@@ -10,61 +10,48 @@ use App\Models\TramoEdad;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\FormulariosExport;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 
 class OrganizacionController extends Controller
 {
-    // Login de organización
     public function login(Request $request)
     {
         $request->validate([
-        'personalidad_juridica' => 'required|string',
-        'clave' => 'required',
-    ]);
+            'personalidad_juridica' => 'required|string',
+            'clave' => 'required',
+        ]);
 
-    $org = Organizacion::where('personalidad_juridica', $request->personalidad_juridica)->first();
+        $org = Organizacion::where('personalidad_juridica', $request->personalidad_juridica)->first();
 
-    if (!$org || !Hash::check($request->clave, $org->clave)) {
-        return back()->withErrors(['personalidad_juridica' => 'Credenciales incorrectas']);
-    }
+        if (!$org || !\Illuminate\Support\Facades\Hash::check($request->clave, $org->clave)) {
+            return back()->withErrors(['personalidad_juridica' => 'Credenciales incorrectas'])->withInput();
+        }
 
+        // 👇 Bloquear inicio de sesión si no hay periodo abierto
+        $periodoAbierto = Periodo::where('estado', 'abierto')->latest('anio')->first();
+        if (!$periodoAbierto) {
+            return back()->withErrors([
+                'msg' => 'La inscripción está cerrada actualmente. Intente más tarde o contacte a la Municipalidad.'
+            ])->withInput();
+        }
 
         session(['organizacion_id' => $org->id]);
 
-        return redirect()->route('formulario');
+        return redirect()->route('panel.inicio');
     }
 
-    public function showForm()
+
+    public function logout(Request $request)
     {
-        $organizacion_id = session('organizacion_id'); 
+        $request->session()->forget('organizacion_id');
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
-        $periodo = Periodo::where('estado', 'abierto')->latest('anio')->first();
-
-        if (!$periodo) {
-            abort(500, 'No hay periodos abiertos.');
-        }
-
-        $formulario = Formulario::where('organizacion_id', $organizacion_id)
-                                ->where('estado', 'abierto')
-                                ->where('periodo_id', $periodo->id)
-                                ->latest('created_at')
-                                ->first();
-
-        if (!$formulario) {
-            $periodo = Periodo::first(); 
-
-            $formulario = Formulario::create([
-                'organizacion_id' => 1, 
-                'estado' => 'abierto',
-                'periodo_id' => $periodo->id,
-            ]);
-
-        }
-
-        $beneficiarios = Beneficiario::where('formulario_id', $formulario->id)
-                                ->latest()
-                                ->get();
-
-        return view('organizaciones.formulario', compact('beneficiarios', 'formulario'));
+        return redirect()->route('organizacion.login.form')
+            ->with('cerrado', 'Sesión cerrada correctamente.');
     }
 
 
@@ -94,7 +81,97 @@ class OrganizacionController extends Controller
 
 
     
-    
+    public function inicio(Request $request)
+    {
+        $organizacionId = $request->session()->get('organizacion_id');
+        if (!$organizacionId) {
+            return redirect('/')->with('status', 'Debes iniciar sesión.');
+        }
+
+        $organizacion = Organizacion::findOrFail($organizacionId);
+
+        // 👇 Trae formularios + periodo y el conteo de beneficiarios
+        $formularios = Formulario::with('periodo')
+            ->withCount('beneficiarios')
+            ->where('organizacion_id', $organizacionId)
+            ->orderByDesc('id')
+            ->paginate(10);
+
+        // Para mostrar/ocultar el botón "Nuevo formulario"
+        $periodoAbierto = Periodo::where('estado', 'abierto')->latest('anio')->first();
+
+        return view('organizaciones.panel', compact('organizacion', 'formularios', 'periodoAbierto'));
+    }
+
+
+    public function showForm(Request $request)
+    {
+        $organizacionId = $request->session()->get('organizacion_id');
+        if (!$organizacionId) {
+            return redirect()->route('organizacion.login.form')->with('status', 'Debes iniciar sesión.');
+        }
+
+        $periodo = Periodo::where('estado', 'abierto')->latest('anio')->first();
+        if (!$periodo) {
+            return redirect()->route('panel.inicio')->with('status', 'No hay periodos abiertos actualmente.');
+        }
+
+        $formulario = Formulario::where('organizacion_id', $organizacionId)
+            ->where('periodo_id', $periodo->id)
+            ->where('estado', 'abierto')
+            ->latest('created_at')
+            ->first();
+
+        if (!$formulario) {
+            $formulario = Formulario::create([
+                'organizacion_id' => $organizacionId,
+                'estado'          => 'abierto',
+                'periodo_id'      => $periodo->id,
+            ]);
+        }
+
+                $beneficiarios = Beneficiario::where('formulario_id', $formulario->id)
+            ->latest()
+            ->get();
+
+        $organizacion = Organizacion::find($organizacionId);
+        return view('organizaciones.formulario', compact('beneficiarios', 'formulario', 'organizacion'));
+    }
+
+
+
+
+    public function verFormulario($id)
+    {
+        $organizacionId = session('organizacion_id');
+        if (!$organizacionId) {
+            return redirect('/')->with('status', 'Debes iniciar sesión.');
+        }
+
+        $formulario = Formulario::with('periodo')
+            ->withCount('beneficiarios')
+            ->findOrFail($id);
+
+        if ($formulario->organizacion_id !== $organizacionId) {
+            abort(403, 'No autorizado');
+        }
+
+        $beneficiarios = Beneficiario::where('formulario_id', $formulario->id)
+            ->orderBy('nombre_completo')
+            ->paginate(15);
+
+        $organizacion   = Organizacion::find($organizacionId);
+        $periodoAbierto = Periodo::where('estado','abierto')->latest('anio')->first();
+
+        return view('organizaciones.formulario-show', compact(
+            'formulario','beneficiarios','organizacion','periodoAbierto'
+        ));
+    }
+
+
+
+
+
     public function storeBeneficiario(Request $request)
     {
 
@@ -139,31 +216,28 @@ class OrganizacionController extends Controller
             'tramo_id' => $tramo->id,
         ]);
 
-        return redirect()->route('formulario')
+        return redirect()->route('formulario.show')
                         ->with('success_ben', 'Beneficiario registrado correctamente.');
     }
 
 
-    public function cerrar(Request $request)
+  public function cerrar(Request $request)
     {
-        $organizacion_id = session('organizacion_id');
-
-        if (!$organizacion_id) {
-            return redirect()->route('organizacion.login.form')->withErrors(['msg' => 'No hay sesión activa.']);
+        $organizacionId = $request->session()->get('organizacion_id');
+        if (!$organizacionId) {
+            return redirect()->route('organizacion.login.form')->with('status', 'Debes iniciar sesión.');
         }
 
-        $org = Organizacion::find($organizacion_id);
+        Formulario::where('organizacion_id', $organizacionId)
+            ->where('estado', 'abierto')
+            ->update(['estado' => 'cerrado']);
 
-        if ($org) {
-            $org->clave = null; // se elimina la contraseña
-            $org->save();
-            session()->forget('organizacion_id'); // cerrar sesión
-        }
-
-        return redirect()->route('organizacion.login.form')
-            ->with('cerrado', 'La inscripción ha sido cerrada. Si necesita abrir otro periodo, contacte al administrador de la Municipalidad.');
-
+        return redirect()->route('panel.inicio')
+            ->with('cerrado', 'La inscripción fue cerrada. Se creó un nuevo ciclo; ya no podrás agregar más en el formulario anterior.');
     }
+
+
+
 
 
     public function showLoginForm()
@@ -191,8 +265,11 @@ class OrganizacionController extends Controller
             abort(403, 'No autorizado');
         }
 
-        return view('organizaciones.edit-beneficiario', compact('beneficiario'));
+        $from = request('from', 'show');
+
+        return view('organizaciones.edit-beneficiario', compact('beneficiario','from'));
     }
+
 
     public function update(Request $request, $id)
     {
@@ -202,18 +279,37 @@ class OrganizacionController extends Controller
             abort(403, 'No autorizado');
         }
 
+
+        $rutLimpio = $this->cleanRut($request->input('rut', ''));
+        if (!$this->validateRut($rutLimpio)) {
+            return back()->withErrors(['rut' => "RUT inválido: $rutLimpio"])->withInput();
+        }
         $request->validate([
-            'nombre_completo' => 'required',
+            'nombre_completo'  => 'required|string',
             'fecha_nacimiento' => 'required|date',
-            'sexo' => 'nullable|in:M,F,U',
-            'direccion' => 'required',
+            'sexo'             => 'nullable|in:M,F,U',
+            'direccion'        => 'required|string',
         ]);
 
-        $beneficiario->update($request->only([
-            'nombre_completo', 'fecha_nacimiento', 'sexo', 'direccion'
-        ]));
+        $edadMeses = \Carbon\Carbon::parse($request->fecha_nacimiento)->diffInMonths(now());
+        $tramo = TramoEdad::where('edad_min_meses', '<=', $edadMeses)
+                ->where('edad_max_meses', '>=', $edadMeses)
+                ->first();
 
-        return redirect()->route('formulario')->with('success_ben', 'Beneficiario actualizado correctamente.');
+        if (!$tramo) {
+            return back()->withErrors(['edad' => 'No existe un tramo de edad para este beneficiario.'])->withInput();
+        }
+        $beneficiario->rut              = $rutLimpio;
+        $beneficiario->nombre_completo  = $request->nombre_completo;
+        $beneficiario->fecha_nacimiento = $request->fecha_nacimiento;
+        $beneficiario->sexo             = $request->sexo;
+        $beneficiario->direccion        = $request->direccion;
+        $beneficiario->tramo_id         = $tramo->id;
+        $beneficiario->save(); 
+
+        return redirect()
+            ->route('formularios.show', $beneficiario->formulario_id)
+            ->with('success_ben', 'Beneficiario actualizado correctamente.');
     }
 
     public function destroy($id)
@@ -226,8 +322,183 @@ class OrganizacionController extends Controller
 
         $beneficiario->delete();
 
-        return redirect()->route('formulario')->with('success_ben', 'Beneficiario eliminado correctamente.');
+        return redirect()->route('formulario.show')->with('success_ben', 'Beneficiario eliminado correctamente.');
     }
+
+
+
+
+
+
+
+
+    public function descargar(Request $request)
+    {
+        $organizacionId = $request->session()->get('organizacion_id');
+        if (!$organizacionId) {
+            return redirect()->route('organizacion.login.form')->with('status', 'Debes iniciar sesión.');
+        }
+
+        $organizacion = Organizacion::findOrFail($organizacionId);
+
+        // Trae formularios con periodo y beneficiarios
+        $formularios = Formulario::with(['periodo', 'beneficiarios'])
+            ->where('organizacion_id', $organizacionId)
+            ->orderByDesc('id')
+            ->get();
+
+        // Stream CSV (UTF-8 con BOM para que Excel muestre bien tildes)
+        $filename = 'formularios_'.$organizacion->id.'_'.now()->format('Ymd_His').'.csv';
+
+        $headers = [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"$filename\"",
+        ];
+
+        return response()->stream(function () use ($formularios, $organizacion) {
+            $out = fopen('php://output', 'w');
+
+            // BOM
+            fwrite($out, "\xEF\xBB\xBF");
+
+            // Encabezados
+            fputcsv($out, [
+                'Organización',
+                'Formulario ID',
+                'Formulario Estado',
+                'Formulario Creado',
+                'Periodo Año',
+                'Periodo Estado',
+                'Beneficiario ID',
+                'RUT',
+                'Nombre Completo',
+                'Fecha Nacimiento',
+                'Sexo',
+                'Dirección',
+                'Tramo ID',
+                'Beneficiario Creado',
+            ]);
+
+            foreach ($formularios as $form) {
+                if ($form->beneficiarios->isEmpty()) {
+                    // fila “sin beneficiarios” (útil para tener registro del formulario)
+                    fputcsv($out, [
+                        $organizacion->nombre ?? $organizacion->id,
+                        $form->id,
+                        $form->estado,
+                        optional($form->created_at)->format('Y-m-d H:i'),
+                        optional($form->periodo)->anio,
+                        optional($form->periodo)->estado,
+                        '', '', '', '', '', '', '', // campos de beneficiario vacíos
+                    ]);
+                    continue;
+                }
+
+                foreach ($form->beneficiarios as $b) {
+                    fputcsv($out, [
+                        $organizacion->nombre ?? $organizacion->id,
+                        $form->id,
+                        $form->estado,
+                        optional($form->created_at)->format('Y-m-d H:i'),
+                        optional($form->periodo)->anio,
+                        optional($form->periodo)->estado,
+                        $b->id,
+                        $b->rut,
+                        $b->nombre_completo,
+                        $b->fecha_nacimiento,
+                        $b->sexo,
+                        $b->direccion,
+                        $b->tramo_id,
+                        optional($b->created_at)->format('Y-m-d H:i'),
+                    ]);
+                }
+            }
+
+            fclose($out);
+        }, 200, $headers);
+    }
+
+    
+    private function buildExportRows(int $organizacionId): \Illuminate\Support\Collection
+    {
+        $organizacion = Organizacion::findOrFail($organizacionId);
+
+        $formularios = Formulario::with(['periodo','beneficiarios'])
+            ->where('organizacion_id', $organizacionId)
+            ->orderByDesc('id')
+            ->get();
+
+        $rows = collect();
+        foreach ($formularios as $form) {
+            if ($form->beneficiarios->isEmpty()) {
+                $rows->push([
+                    $organizacion->nombre ?? $organizacion->id,
+                    $form->id, $form->estado, optional($form->created_at)->format('Y-m-d H:i'),
+                    optional($form->periodo)->anio, optional($form->periodo)->estado,
+                    '', '', '', '', '', '', '',
+                ]);
+            } else {
+                foreach ($form->beneficiarios as $b) {
+                    $rows->push([
+                        $organizacion->nombre ?? $organizacion->id,
+                        $form->id, $form->estado, optional($form->created_at)->format('Y-m-d H:i'),
+                        optional($form->periodo)->anio, optional($form->periodo)->estado,
+                        $b->id, $b->rut, $b->nombre_completo, $b->fecha_nacimiento, $b->sexo, $b->direccion, $b->tramo_id,
+                    ]);
+                }
+            }
+        }
+        return $rows;
+    }
+
+    public function exportXlsx(Request $request)
+    {
+        $orgId = $request->session()->get('organizacion_id');
+        if (!$orgId) return redirect()->route('organizacion.login.form');
+
+        $rows = $this->buildExportRows($orgId);
+        $filename = 'formularios_'.$orgId.'_'.now()->format('Ymd_His').'.xlsx';
+
+        return Excel::download(new FormulariosExport($rows), $filename);
+    }
+
+
+
+
+
+
+
+    public function exportPdf(Request $request)
+    {
+        $orgId = $request->session()->get('organizacion_id');
+        if (!$orgId) return redirect()->route('organizacion.login.form');
+
+        $organizacion = Organizacion::findOrFail($orgId);
+        $formularios = Formulario::with(['periodo','beneficiarios'])
+            ->where('organizacion_id', $orgId)
+            ->orderByDesc('id')
+            ->get();
+
+        $html = view('organizaciones.exports.formularios-pdf', compact('organizacion','formularios'))->render();
+
+        $options = new Options();
+        $options->set('isRemoteEnabled', true);
+        $options->set('defaultFont', 'DejaVu Sans'); // soporte UTF-8
+
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4', 'landscape');
+        $dompdf->render();
+
+        $filename = 'formularios_'.$orgId.'_'.now()->format('Ymd_His').'.pdf';
+        return response($dompdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "attachment; filename=\"$filename\"",
+        ]);
+    }
+
+
+
 
 }
 

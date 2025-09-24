@@ -8,9 +8,7 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col">
 
-<header class="w-full bg-blue-600 text-white p-4 flex justify-between items-center shadow">
-    <h1 class="text-xl font-bold">Formulario de registro de Navidad - Ilustre Municipalidad de Padre las Casas</h1>
-</header>
+@include('organizaciones.partials.header', ['organizacion' => $organizacion])
 
 <main class="flex-grow flex flex-col items-center p-6 space-y-10">
 
@@ -25,7 +23,7 @@
                 if (RUT.isValid(rutInput.value)) {
                     rutInput.value = RUT.format(rutInput.value); // formatea como 12.345.678-9
                 } else {
-                    alert("RUT inválido, por favor verifica.");
+                    alert("RUT invalido, por favor verifica.");
                     rutInput.focus();
                 }
             });
@@ -45,7 +43,7 @@
         @if(session('status'))
         <div class="max-w-lg mx-auto mb-6">
             <div class="bg-gradient-to-r from-red-500 to-pink-500 text-white text-center p-4 rounded-xl shadow-lg animate-bounce">
-                <h2 class="text-xl font-bold mb-2">Inscripción cerrada</h2>
+                <h2 class="text-xl font-bold mb-2">Inscripcion cerrada</h2>
                 <p class="text-sm">{{ session('status') }}</p>
                 <p class="mt-2 text-xs opacity-90">Si necesita volver a habilitar su acceso, contacte a la Municipalidad.</p>
             </div>
@@ -97,7 +95,7 @@
                 </select>
             </div>
             <div>
-                <label>Dirección</label>
+                <label>Direccion</label>
                 <input type="text" name="direccion" class="w-full border rounded p-2" required>
             </div>
 
@@ -112,17 +110,24 @@
         type="button" 
         onclick="abrirModal()" 
         class="w-full bg-red-600 text-white py-2 rounded hover:bg-red-700 transition">
-        Cerrar Inscripción
+        Cerrar Inscripcion
     </button>
 </div>
+<div class="mt-6 w-full max-w-lg">
+    <a href="{{ route('panel.inicio') }}"
+       class="block w-full bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 rounded-lg text-center transition">
+        Volver al panel
+    </a>
+</div>
+
 
 <!-- Modal -->
 <div id="modalConfirmar" class="fixed inset-0 bg-black bg-opacity-50 hidden justify-center items-center">
     <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md transform transition-all scale-95">
         <h2 class="text-xl font-bold text-red-600 mb-4 text-center"> Confirmar Cierre</h2>
         <p class="text-gray-700 text-center mb-6">
-            ¿Estás seguro que quieres <span class="font-semibold">cerrar la inscripción</span>?<br>
-            Una vez cerrada, no podrás registrar más beneficiarios.
+            多Estas seguro que quieres <span class="font-semibold">cerrar la inscripcion/span>?<br>
+            Una vez cerrada, no podras registrar mas beneficiarios en este formulario.
         </p>
 
         <div class="flex justify-between">
@@ -132,7 +137,7 @@
             <form method="POST" action="{{ route('organizacion.cerrar') }}">
                 @csrf
                 <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">
-                     Sí, cerrar
+                     Si, cerrar
                 </button>
             </form>
         </div>
@@ -157,7 +162,7 @@
         <h2 class="text-xl font-bold mb-4">Beneficiarios Registrados</h2>
 
         @if($beneficiarios->isEmpty())
-            <p class="text-gray-600">No hay beneficiarios registrados aún.</p>
+            <p class="text-gray-600">No hay beneficiarios registrados aun</p>
         @else
             <table class="min-w-full bg-white border border-gray-300 rounded-lg shadow">
                 <thead class="bg-gray-100">
@@ -167,43 +172,43 @@
                         <th class="px-4 py-2 border">Fecha Nac.</th>
                         <th class="px-4 py-2 border">Edad</th>
                         <th class="px-4 py-2 border">RUT</th>
-                        <th class="px-4 py-2 border">Dirección</th>
+                        <th class="px-4 py-2 border">Direccion</th>
                         <th class="px-4 py-2 border">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach($beneficiarios as $ben)
-                        <tr>
-                            <td class="px-4 py-2 border">{{ $ben->id }}</td>
-                            <td class="px-4 py-2 border">{{ $ben->nombre_completo }}</td>
-                            <td class="px-4 py-2 border">{{ $ben->fecha_nacimiento }}</td>
-                            <td class="px-4 py-2 border">{{ $ben->edad }}</td>
-                            <td class="px-4 py-2 border">{{ $ben->rut_formateado }}</td>
-                            <td class="px-4 py-2 border">{{ $ben->direccion }}</td>
-                            <td class="px-4 py-2 border text-center">
-                                @if($formulario->estado === 'abierto')
-                                    <a href="{{ route('beneficiario.edit', $ben->id) }}" 
-                                    class="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600">
-                                        Editar
-                                    </a>
-                                    <form action="{{ route('beneficiario.destroy', $ben->id) }}" 
-                                        method="POST" 
-                                        class="inline" 
-                                        onsubmit="return confirm('¿Estás seguro de eliminar este beneficiario?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="button" 
-                                                onclick="abrirModalEliminar({{ $ben->id }}, '{{ $ben->nombre_completo }}')" 
-                                                class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">
-                                            Eliminar
-                                        </button>
-                                    </form>
-                                @else
-                                    <span class="text-gray-400">Cerrado</span>
-                                @endif
-                            </td>
-                        </tr>
-                    @endforeach
+                @foreach($beneficiarios as $ben)
+                    <tr>
+                    <td class="px-4 py-2 border">{{ $ben->id }}</td>
+                    <td class="px-4 py-2 border">{{ $ben->nombre_completo }}</td>
+                    <td class="px-4 py-2 border">{{ $ben->fecha_nacimiento }}</td>
+                    {{-- Edad calculada en años (por si no existe $ben->edad) --}}
+                    <td class="px-4 py-2 border">
+                        {{ \Carbon\Carbon::parse($ben->fecha_nacimiento)->age }}
+                    </td>
+                    {{-- Si tienes accessor rut_formateado, déjalo; si no, usa $ben->rut --}}
+                    <td class="px-4 py-2 border">{{ $ben->rut_formateado ?? $ben->rut }}</td>
+                    <td class="px-4 py-2 border">{{ $ben->direccion }}</td>
+
+                    <td class="px-4 py-2 border text-center">
+                        @if($formulario->estado === 'abierto')
+                        <a href="{{ route('beneficiario.edit', ['id' => $ben->id, 'from' => 'form']) }}"
+                            class="inline-block bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-medium px-3 py-1.5 rounded">
+                            Editar
+                        </a>
+
+                        {{-- Botón que abre modal de confirmación para eliminar --}}
+                        <button type="button"
+                                onclick="abrirModalEliminar({{ $ben->id }}, '{{ addslashes($ben->nombre_completo) }}')"
+                                class="ml-1 bg-red-600 text-white px-3 py-1.5 rounded hover:bg-red-700">
+                            Eliminar
+                        </button>
+                        @else
+                        <span class="text-gray-400">Cerrado</span>
+                        @endif
+                    </td>
+                    </tr>
+                @endforeach
                 </tbody>
             </table>
         @endif
@@ -211,9 +216,9 @@
 
 <div id="modalEliminar" class="fixed inset-0 bg-black bg-opacity-50 hidden justify-center items-center">
     <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md text-center">
-        <h2 class="text-xl font-bold text-red-600 mb-4">Confirmar Eliminación</h2>
+        <h2 class="text-xl font-bold text-red-600 mb-4">Confirmar Eliminacion</h2>
         <p class="text-gray-700 mb-6">
-            ¿Seguro que deseas eliminar a<br>
+            多Estas seguro que deseas eliminar a<br>
             <span id="nombreBeneficiario" class="font-semibold"></span>?
         </p>
 
@@ -227,7 +232,7 @@
                 </button>
                 <button type="submit" 
                         class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">
-                    Sí, eliminar
+                    Si, eliminar
                 </button>
             </div>
         </form>
