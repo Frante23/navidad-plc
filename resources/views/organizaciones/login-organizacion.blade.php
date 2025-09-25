@@ -9,10 +9,16 @@
 <body class="bg-gray-100 min-h-screen flex flex-col">
 
     {{-- Header institucional --}}
-    <header class="w-full bg-blue-600 text-white p-4 flex justify-center items-center shadow">
-        <h1 class="text-xl md:text-2xl font-bold text-center">
-            Programa Navidad – Ilustre Municipalidad de Padre Las Casas
-        </h1>
+    <header class="w-full bg-blue-600 text-white p-4 shadow">
+        <div class="max-w-7xl mx-auto flex items-center space-x-4">
+            <img src="{{ asset('images/logo_muni1.png') }}"
+                 alt="Logo Municipalidad"
+                 class="h-16 md:h-20 lg:h-24 w-auto object-contain">
+
+            <h1 class="text-xl md:text-2xl lg:text-3xl font-bold">
+                Programa Navidad – Ilustre Municipalidad de Padre Las Casas
+            </h1>
+        </div>
     </header>
 
     {{-- Contenido principal --}}

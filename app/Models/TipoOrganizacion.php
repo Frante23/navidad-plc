@@ -9,8 +9,8 @@ class TipoOrganizacion extends Model
 {
     use HasFactory;
 
-    protected $table = 'tipos_organizaciones'; // tabla asociada
-    protected $fillable = ['nombre', 'usable'];
+    protected $table = 'tipos_organizaciones'; 
+    protected $fillable = ['nombre', 'usable', 'fecha_creacion'];
 
-    public $timestamps = true; // si quieres usar fecha_creacion, puedes dejarlo como timestamp
+    public $timestamps = false; 
 }

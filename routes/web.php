@@ -3,6 +3,10 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\OrganizacionController;
 use App\Http\Middleware\EnsureOrganizationIsAuthenticated as OrgAuth;
+use App\Http\Controllers\Muni\AuthMuniController;
+use App\Http\Controllers\Muni\DashboardMuniController;
+
+
 
 // Login (vista + post)
 Route::get('/', [OrganizacionController::class, 'showLoginForm'])->name('organizacion.login.form');
@@ -45,10 +49,6 @@ Route::post('/organizacion/cerrar', [OrganizacionController::class, 'cerrar'])
     ->middleware(OrgAuth::class)
     ->name('organizacion.cerrar');
 
-// Redirección antigua
-Route::get('/login/funcionarios', function () {
-    return redirect()->route('panel.inicio');
-})->name('login.funcionarios');
 
 Route::get('/formularios/descargar', [OrganizacionController::class, 'descargar'])
     ->middleware(\App\Http\Middleware\EnsureOrganizationIsAuthenticated::class)
@@ -63,3 +63,53 @@ Route::get('/formularios/export/xlsx', [OrganizacionController::class, 'exportXl
 
 Route::get('/formularios/export/pdf', [OrganizacionController::class, 'exportPdf'])
     ->middleware(OrgAuth::class)->name('formularios.export.pdf');
+
+
+
+
+
+
+
+Route::get('/login/funcionarios', [AuthMuniController::class, 'showLoginForm'])
+    ->name('login.funcionarios');
+
+Route::post('/login/funcionarios', [AuthMuniController::class, 'login'])
+    ->name('login.funcionarios.post');
+
+Route::post('/logout/funcionarios', [AuthMuniController::class, 'logout'])
+    ->name('logout.funcionarios');
+
+Route::middleware('auth:func')->group(function () {
+    Route::get('/muni', [DashboardMuniController::class, 'index'])
+        ->name('muni.dashboard');
+});
+
+
+Route::middleware('auth:func')->group(function () {
+    Route::get('/muni', [DashboardMuniController::class, 'index'])->name('muni.dashboard');
+    Route::get('/muni/organizacion/{id}', [DashboardMuniController::class, 'showOrg'])->name('muni.org.show');
+
+    Route::get('/muni/export/xlsx', [DashboardMuniController::class, 'exportXlsx'])->name('muni.export.xlsx');
+    Route::get('/muni/export/pdf',  [DashboardMuniController::class, 'exportPdf'])->name('muni.export.pdf');
+
+    Route::get('/muni/organizacion/{id}/export/xlsx', [DashboardMuniController::class, 'exportOrgXlsx'])->name('muni.org.export.xlsx');
+    Route::get('/muni/organizacion/{id}/export/pdf',  [DashboardMuniController::class, 'exportOrgPdf'])->name('muni.org.export.pdf');
+
+    Route::get('/muni/formulario/{id}/export/xlsx', [DashboardMuniController::class, 'exportFormXlsx'])
+        ->name('muni.form.export.xlsx');
+
+    Route::get('/muni/formulario/{id}/export/pdf',  [DashboardMuniController::class, 'exportFormPdf'])
+        ->name('muni.form.export.pdf');
+
+
+    Route::get('/muni/organizaciones/crear', [DashboardMuniController::class, 'createOrg'])->name('muni.org.create');
+    Route::post('/muni/organizaciones/crear', [DashboardMuniController::class, 'storeOrg'])->name('muni.org.store');
+
+
+
+    Route::get('/muni/duplicados', [DashboardMuniController::class, 'duplicados'])->name('muni.duplicados');
+
+
+});
+
+Route::get('/login', fn () => redirect()->route('login.funcionarios'))->name('login');

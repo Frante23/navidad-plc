@@ -8,15 +8,15 @@
 
       <div class="flex flex-col justify-center">
         <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-white">
-          Programa Navidad - Organizaciones – Municipalidad de Padre Las Casas
+          Programa Navidad - Municipales – Municipalidad de Padre Las Casas
         </h1>
         <p class="mt-1 text-sm text-blue-100">
-          Organización: <span class="font-semibold">{{ $organizacion->nombre ?? '—' }}</span>
+          Bienvenido: <span class="font-semibold">{{ $funcionario->nombre_completo ?? 'Funcionario' }}</span>
         </p>
       </div>
     </div>
 
-    <form method="POST" action="{{ route('organizacion.logout') }}">
+    <form method="POST" action="{{ route('logout.funcionarios') }}">
         @csrf
         <button type="submit"
                 class="hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium">
@@ -25,3 +25,6 @@
     </form>
   </div>
 </header>
+
+
+

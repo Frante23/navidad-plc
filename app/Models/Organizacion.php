@@ -20,7 +20,8 @@ class Organizacion extends Model
         'telefono_contacto',
         'observacion',
         'clave',
-        'estado'
+        'estado',
+        'fecha_creacion',  
     ];
 
     public function tipo()
