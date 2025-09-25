@@ -174,29 +174,31 @@ class OrganizacionController extends Controller
 
     public function storeBeneficiario(Request $request)
     {
-
         $rutLimpio = $this->cleanRut($request->rut);
         if (!$this->validateRut($rutLimpio)) {
             return back()->withErrors(['rut' => "RUT inválido: $rutLimpio"])->withInput();
         }
 
-
         $request->validate([
-            'nombre_completo' => 'required',
+            'nombre_completo'  => 'required|string',
             'fecha_nacimiento' => 'required|date',
-            'sexo' => 'nullable|in:M,F,U',
-            'formulario_id' => 'required|exists:formularios,id',
-            'direccion' => 'required',
+            'sexo'             => 'nullable|in:M,F,U',
+            'formulario_id'    => 'required|exists:formularios,id',
+            'direccion'        => 'required|string',
         ]);
-
 
         $edadMeses = \Carbon\Carbon::parse($request->fecha_nacimiento)->diffInMonths(now());
 
+        if ($edadMeses > 11 && ($request->sexo === 'U')) {
+            return back()->withErrors([
+                'sexo' => 'Para mayores de 11 meses, seleccione Masculino o Femenino.'
+            ])->withInput();
+        }
+        $sexo = ($edadMeses <= 11) ? 'U' : ($request->sexo ?: null);
 
         $tramo = TramoEdad::where('edad_min_meses', '<=', $edadMeses)
-                        ->where('edad_max_meses', '>=', $edadMeses)
-                        ->first();
-
+            ->where('edad_max_meses', '>=', $edadMeses)
+            ->first();
 
         if (!$tramo) {
             return back()->withErrors([
@@ -204,16 +206,15 @@ class OrganizacionController extends Controller
             ])->withInput();
         }
 
-
         Beneficiario::create([
-            'rut' => $rutLimpio,
-            'nombre_completo' => $request->nombre_completo,
+            'rut'              => $rutLimpio,
+            'nombre_completo'  => $request->nombre_completo,
             'fecha_nacimiento' => $request->fecha_nacimiento,
-            'sexo' => $request->sexo,
-            'direccion' => $request->direccion,
-            'formulario_id' => $request->formulario_id,
-            'organizacion_id' => session('organizacion_id'),
-            'tramo_id' => $tramo->id,
+            'sexo'             => $sexo, 
+            'direccion'        => $request->direccion,
+            'formulario_id'    => $request->formulario_id,
+            'organizacion_id'  => session('organizacion_id'),
+            'tramo_id'         => $tramo->id,
         ]);
 
         return redirect()->route('formulario.show')
@@ -233,7 +234,7 @@ class OrganizacionController extends Controller
             ->update(['estado' => 'cerrado']);
 
         return redirect()->route('panel.inicio')
-            ->with('cerrado', 'La inscripción fue cerrada. Se creó un nuevo ciclo; ya no podrás agregar más en el formulario anterior.');
+            ->with('cerrado', 'Formulario Cerrado. No puede agregar nuevos beneficiarios.');
     }
 
 
@@ -279,11 +280,11 @@ class OrganizacionController extends Controller
             abort(403, 'No autorizado');
         }
 
-
         $rutLimpio = $this->cleanRut($request->input('rut', ''));
         if (!$this->validateRut($rutLimpio)) {
             return back()->withErrors(['rut' => "RUT inválido: $rutLimpio"])->withInput();
         }
+
         $request->validate([
             'nombre_completo'  => 'required|string',
             'fecha_nacimiento' => 'required|date',
@@ -292,25 +293,37 @@ class OrganizacionController extends Controller
         ]);
 
         $edadMeses = \Carbon\Carbon::parse($request->fecha_nacimiento)->diffInMonths(now());
+
+        if ($edadMeses > 11 && ($request->sexo === 'U')) {
+            return back()->withErrors([
+                'sexo' => 'Para mayores de 11 meses, seleccione Masculino o Femenino.'
+            ])->withInput();
+        }
+        $sexo = ($edadMeses <= 11) ? 'U' : ($request->sexo ?: null);
+
         $tramo = TramoEdad::where('edad_min_meses', '<=', $edadMeses)
-                ->where('edad_max_meses', '>=', $edadMeses)
-                ->first();
+            ->where('edad_max_meses', '>=', $edadMeses)
+            ->first();
 
         if (!$tramo) {
-            return back()->withErrors(['edad' => 'No existe un tramo de edad para este beneficiario.'])->withInput();
+            return back()->withErrors([
+                'edad' => 'No existe un tramo de edad para este beneficiario.'
+            ])->withInput();
         }
+
         $beneficiario->rut              = $rutLimpio;
         $beneficiario->nombre_completo  = $request->nombre_completo;
         $beneficiario->fecha_nacimiento = $request->fecha_nacimiento;
-        $beneficiario->sexo             = $request->sexo;
+        $beneficiario->sexo             = $sexo; 
         $beneficiario->direccion        = $request->direccion;
         $beneficiario->tramo_id         = $tramo->id;
-        $beneficiario->save(); 
+        $beneficiario->save();
 
         return redirect()
             ->route('formularios.show', $beneficiario->formulario_id)
             ->with('success_ben', 'Beneficiario actualizado correctamente.');
     }
+
 
     public function destroy($id)
     {

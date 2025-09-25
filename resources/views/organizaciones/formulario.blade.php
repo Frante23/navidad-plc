@@ -16,19 +16,88 @@
 
     <script src="https://cdn.jsdelivr.net/npm/rut.js/dist/rut.min.js"></script>
     <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const rutInput = document.querySelector("input[name='rut']");
-            
-            rutInput.addEventListener("blur", () => {
-                if (RUT.isValid(rutInput.value)) {
-                    rutInput.value = RUT.format(rutInput.value); // formatea como 12.345.678-9
-                } else {
-                    alert("RUT invalido, por favor verifica.");
-                    rutInput.focus();
-                }
-            });
+    document.addEventListener("DOMContentLoaded", () => {
+    const rutInput = document.querySelector("input[name='rut']");
+    if (rutInput && typeof RUT !== "undefined") {
+        rutInput.addEventListener("blur", () => {
+        if (RUT.isValid(rutInput.value)) {
+            rutInput.value = RUT.format(rutInput.value);
+        } else {
+            alert("RUT invalido, por favor verifica.");
+            rutInput.focus();
+        }
         });
+    }
+
+    const fechaInput = document.querySelector("input[name='fecha_nacimiento']");
+    const sexoSelect = document.querySelector("select[name='sexo']");
+    const noteId = "sexo-unisex-note";
+
+    let optU = null;
+    if (sexoSelect) {
+        optU = [...sexoSelect.options].find(o => o.value === "U");
+    }
+
+    function monthsBetween(d1, d2) {
+        let m = (d2.getFullYear() - d1.getFullYear()) * 12 + (d2.getMonth() - d1.getMonth());
+        if (d2.getDate() < d1.getDate()) m--;
+        return m;
+    }
+
+    function ensureNote() {
+        let note = document.getElementById(noteId);
+        if (!note) {
+        note = document.createElement("small");
+        note.id = noteId;
+        note.className = "block mt-1 text-xs text-gray-500";
+        sexoSelect.parentElement.appendChild(note);
+        }
+        return note;
+    }
+
+    function enforceUnisexIfNeeded() {
+        if (!fechaInput || !sexoSelect || !fechaInput.value) return;
+        const dob = new Date(fechaInput.value + "T00:00:00");
+        const today = new Date();
+        const months = monthsBetween(dob, today);
+        const note = ensureNote();
+
+        if (months >= 0 && months <= 11) {
+        if (optU) {
+            optU.disabled = false;
+            optU.hidden = false;
+        } else {
+            const o = document.createElement("option");
+            o.value = "U";
+            o.textContent = "Unisex (0 a 11 meses)";
+            sexoSelect.appendChild(o);
+            optU = o;
+        }
+        sexoSelect.value = "U";
+        sexoSelect.setAttribute("disabled", "disabled");
+        note.textContent = "Sexo fijado automáticamente a Unisex para 0–11 meses.";
+        } else {
+        if (sexoSelect.hasAttribute("disabled")) {
+            sexoSelect.removeAttribute("disabled");
+        }
+        if (optU) {
+            if (sexoSelect.value === "U") sexoSelect.value = "";
+            optU.disabled = true;
+            optU.hidden = true;
+        }
+        note.textContent = "";
+        }
+    }
+
+    if (fechaInput) {
+        fechaInput.addEventListener("change", enforceUnisexIfNeeded);
+        fechaInput.addEventListener("blur", enforceUnisexIfNeeded);
+        enforceUnisexIfNeeded();
+    }
+    });
     </script>
+
+
 
 
     @if(session('success_ben'))
@@ -126,7 +195,7 @@
     <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md transform transition-all scale-95">
         <h2 class="text-xl font-bold text-red-600 mb-4 text-center"> Confirmar Cierre</h2>
         <p class="text-gray-700 text-center mb-6">
-            多Estas seguro que quieres <span class="font-semibold">cerrar la inscripcion/span>?<br>
+            ¿Estas seguro que quieres <span class="font-semibold">cerrar la inscripcion?<br>
             Una vez cerrada, no podras registrar mas beneficiarios en este formulario.
         </p>
 
@@ -218,8 +287,8 @@
     <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md text-center">
         <h2 class="text-xl font-bold text-red-600 mb-4">Confirmar Eliminacion</h2>
         <p class="text-gray-700 mb-6">
-            多Estas seguro que deseas eliminar a<br>
-            <span id="nombreBeneficiario" class="font-semibold"></span>?
+            Estas seguro que deseas eliminar a<br>
+            <span id="nombreBeneficiario" class="font-semibold"></span>
         </p>
 
         <form id="formEliminar" method="POST">
