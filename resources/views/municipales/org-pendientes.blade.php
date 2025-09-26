@@ -71,56 +71,51 @@
             {{ $pendientes->links() }}
           </div>
         </div>
-        <div class="bg-white rounded-xl shadow overflow-hidden">
-          <div class="px-4 py-3 border-b flex items-center justify-between">
-            <h2 class="font-semibold">Organizaciones inactivas</h2>
-            <span class="text-sm text-gray-500">Se pueden reactivar (nueva contraseña)</span>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">PJ</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actualizada</th>
-                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                @forelse($inactivas as $org)
-                  <tr>
-                    <td class="px-4 py-2 text-sm">{{ $org->nombre }}</td>
-                    <td class="px-4 py-2 text-sm">{{ $org->personalidad_juridica }}</td>
-                    <td class="px-4 py-2 text-sm">{{ $org->email }}</td>
-                    <td class="px-4 py-2 text-sm">{{ $org->updated_at?->format('d-m-Y H:i') }}</td>
-                    <td class="px-4 py-2">
-                      <div class="flex items-center justify-end gap-2">
-                        <form method="POST" action="{{ route('muni.org.aprobar', $org->id) }}" class="flex items-center gap-2">
-                          @csrf
-                          <input type="password" name="clave" placeholder="Nueva contraseña (opcional)"
-                                 class="border rounded px-2 py-1 text-sm">
-                          <button class="bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1.5 rounded">
-                            Reactivar
-                          </button>
+        <div class="bg-white rounded-xl shadow mt-6">
+            <div class="px-4 py-3 border-b flex items-center justify-between">
+                <h2 class="font-semibold">Organizaciones inactivas</h2>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Organización</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">PJ</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actualizado</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    @forelse($inactivas as $org)
+                    <tr>
+                        <td class="px-4 py-3">{{ $org->nombre }}</td>
+                        <td class="px-4 py-3">{{ $org->personalidad_juridica }}</td>
+                        <td class="px-4 py-3">{{ $org->email ?: '—' }}</td>
+                        <td class="px-4 py-3">{{ $org->updated_at?->format('d-m-Y H:i') }}</td>
+                        <td class="px-4 py-3">
+                        <form method="POST" action="{{ route('muni.org.activarInactiva', $org->id) }}" class="flex items-center gap-2">
+                            @csrf
+                            <input type="password" name="clave" class="border rounded px-2 py-1 text-sm" placeholder="Nueva contraseña" required>
+                            <input type="password" name="clave_confirmation" class="border rounded px-2 py-1 text-sm" placeholder="Confirmar" required>
+                            <button class="bg-green-600 text-white text-sm px-3 py-1 rounded hover:bg-green-700">
+                            Activar
+                            </button>
                         </form>
-                      </div>
-                    </td>
-                  </tr>
-                @empty
-                  <tr>
-                    <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500">
-                      No hay organizaciones inactivas.
-                    </td>
-                  </tr>
-                @endforelse
-              </tbody>
-            </table>
-          </div>
-          <div class="px-4 py-3 border-t">
-            {{ $inactivas->links() }}
-          </div>
-        </div>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr><td colspan="5" class="px-4 py-6 text-center text-gray-500">No hay inactivas.</td></tr>
+                    @endforelse
+                </tbody>
+                </table>
+            </div>
+
+            <div class="px-4 py-3 border-t">
+                {{ $inactivas->links() }}
+            </div>
+            </div>
       </div>
     </div>
   </div>

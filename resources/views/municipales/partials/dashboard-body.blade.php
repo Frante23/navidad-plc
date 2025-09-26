@@ -1,9 +1,11 @@
+{{-- Mensaje de éxito --}}
 @if(session('status'))
   <div class="mb-4 bg-green-100 text-green-800 border border-green-300 px-4 py-2 rounded">
     {{ session('status') }}
   </div>
 @endif
 
+{{-- Filtros / Buscador --}}
 <form method="GET" action="{{ route('muni.dashboard') }}"
       class="bg-white p-4 rounded-xl shadow flex flex-wrap gap-3 items-end"
       id="filtrosForm">
@@ -37,7 +39,6 @@
   </div>
 
   <div class="ml-auto flex gap-2">
-
     <a href="{{ route('muni.export.xlsx', request()->query()) }}"
        class="bg-gray-100 text-gray-800 px-4 py-2 rounded-md ring-1 ring-gray-300 hover:bg-gray-200">
       Descargar Excel
@@ -49,13 +50,17 @@
   </div>
 </form>
 
-{{-- autosubmit opcional si quieres que al cambiar “Estado” se envíe solo --}}
+{{-- autosubmit al cambiar Estado (opcional) --}}
 <script>
   document.getElementById('estadoSelect')
     ?.addEventListener('change', () => document.getElementById('filtrosForm').submit());
 </script>
 
-{{-- Tabla de organizaciones --}}
+{{-- Tabla --}}
+@php
+  $dir = request('direction') === 'asc' ? 'desc' : 'asc';
+@endphp
+
 <div class="bg-white rounded-xl shadow overflow-hidden mt-6">
   <div class="px-4 py-3 border-b">
     <h3 class="font-semibold">Organizaciones</h3>
@@ -65,29 +70,40 @@
     <table class="min-w-full divide-y divide-gray-200">
       <thead class="bg-gray-50">
         <tr>
-          @php
-            $dir = request('direction') === 'asc' ? 'desc' : 'asc';
-          @endphp
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                <a href="{{ route('muni.dashboard', array_merge(request()->all(), ['sort'=>'nombre','direction'=>$dir])) }}">Organización</a>
-              </th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                <a href="{{ route('muni.dashboard', array_merge(request()->all(), ['sort'=>'personalidad_juridica','direction'=>$dir])) }}">PJ</a>
-              </th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                <a href="{{ route('muni.dashboard', array_merge(request()->all(), ['sort'=>'formularios','direction'=>$dir])) }}">Formularios</a>
-              </th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                <a href="{{ route('muni.dashboard', array_merge(request()->all(), ['sort'=>'beneficiarios','direction'=>$dir])) }}">Beneficiarios</a>
-              </th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                <a href="{{ route('muni.dashboard', array_merge(request()->all(), ['sort'=>'estado','direction'=>$dir])) }}">Estado</a>
-              </th>
-              <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
-            </tr>
-          </thead>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <a href="{{ route('muni.dashboard', array_merge(request()->all(), ['sort'=>'nombre','direction'=>$dir])) }}">
+              Organización
+            </a>
+          </th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <a href="{{ route('muni.dashboard', array_merge(request()->all(), ['sort'=>'personalidad_juridica','direction'=>$dir])) }}">
+              PJ
+            </a>
+          </th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <a href="{{ route('muni.dashboard', array_merge(request()->all(), ['sort'=>'formularios','direction'=>$dir])) }}">
+              Formularios
+            </a>
+          </th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <a href="{{ route('muni.dashboard', array_merge(request()->all(), ['sort'=>'beneficiarios','direction'=>$dir])) }}">
+              Beneficiarios
+            </a>
+          </th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            Por tramo
+          </th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <a href="{{ route('muni.dashboard', array_merge(request()->all(), ['sort'=>'estado','direction'=>$dir])) }}">
+              Estado
+            </a>
+          </th>
+          <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+            Acciones
+          </th>
+        </tr>
+      </thead>
+
       <tbody class="bg-white divide-y divide-gray-200">
         @forelse($organizaciones as $org)
           @php
@@ -102,10 +118,18 @@
                 $tramoCounts[$row->tramo_id] = $row->c;
               }
             }
+
+            $badge = match($org->estado) {
+              'activo'    => 'bg-green-100 text-green-800',
+              'pendiente' => 'bg-yellow-100 text-yellow-800',
+              default     => 'bg-red-100 text-red-800',
+            };
           @endphp
+
           <tr>
             <td class="px-4 py-3 text-sm text-gray-900">{{ $org->nombre }}</td>
             <td class="px-4 py-3 text-sm text-gray-700">{{ $org->personalidad_juridica }}</td>
+
             <td class="px-4 py-3 text-sm">
               <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800">
                 Abiertos: {{ $abiertos }}
@@ -114,7 +138,9 @@
                 Cerrados: {{ $cerrados }}
               </span>
             </td>
+
             <td class="px-4 py-3 text-sm">{{ $totalBen }}</td>
+
             <td class="px-4 py-3 text-sm">
               <div class="flex flex-wrap gap-1">
                 @foreach($tramos as $t)
@@ -126,41 +152,26 @@
                 @endforeach
               </div>
             </td>
+
             <td class="px-4 py-3 text-sm">
-              @php
-                $badge = match($org->estado) {
-                  'activo'    => 'bg-green-100 text-green-800',
-                  'pendiente' => 'bg-yellow-100 text-yellow-800',
-                  default     => 'bg-red-100 text-red-800',
-                };
-              @endphp
               <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {{ $badge }}">
                 {{ ucfirst($org->estado) }}
               </span>
             </td>
-            <td class="px-4 py-3 text-right space-x-1">
+
+            <td class="px-4 py-3 text-right space-x-2">
               <a href="{{ route('muni.org.show', ['id'=>$org->id] + request()->only('periodo_id')) }}"
                  class="text-sm font-medium text-indigo-600 hover:text-indigo-800">
                 Ver formularios
               </a>
 
-              {{-- Botones de estado --}}
-              @if($org->estado === 'pendiente')
-            
-              @elseif($org->estado === 'activo')
+              {{-- Acciones por estado --}}
+              @if($org->estado === 'activo')
                 <form method="POST" action="{{ route('muni.org.setStatus', $org->id) }}" class="inline">
                   @csrf
                   <input type="hidden" name="estado" value="inactivo">
                   <button class="text-xs px-2 py-1 rounded ring-1 ring-red-300 text-red-700 hover:bg-red-50">
                     Desactivar
-                  </button>
-                </form>
-              @elseif($org->estado === 'inactivo')
-                <form method="POST" action="{{ route('muni.org.setStatus', $org->id) }}" class="inline">
-                  @csrf
-                  <input type="hidden" name="estado" value="activo">
-                  <button class="text-xs px-2 py-1 rounded ring-1 ring-green-300 text-green-700 hover:bg-green-50">
-                    Activar
                   </button>
                 </form>
               @endif

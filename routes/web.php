@@ -74,4 +74,26 @@ Route::middleware('auth:func')->group(function () {
 
     Route::post('/muni/organizacion/{id}/status', [DashboardMuniController::class, 'setOrgStatus'])
         ->name('muni.org.setStatus');
+
+    Route::middleware('auth:func')->group(function () {
+    Route::post('/muni/organizacion/{id}/desactivar', [DashboardMuniController::class, 'orgDesactivar'])
+        ->name('muni.org.desactivar');
+
+    Route::post('/muni/organizacion/{id}/reactivar', [DashboardMuniController::class, 'orgReactivar'])
+        ->name('muni.org.reactivar');
+});
+    // Pendientes (aprobar / rechazar)
+    Route::get('/muni/pendientes', [DashboardMuniController::class, 'orgPendientes'])
+        ->name('muni.org.pendientes');
+
+    Route::post('/muni/pendientes/{id}/aprobar', [DashboardMuniController::class, 'orgAprobar'])
+        ->name('muni.org.aprobar');
+
+    Route::post('/muni/pendientes/{id}/rechazar', [DashboardMuniController::class, 'orgRechazar'])
+        ->name('muni.org.rechazar');
+
+    // Inactivas -> Activar con nueva clave
+    Route::post('/muni/inactivas/{id}/activar', [DashboardMuniController::class, 'orgActivarInactiva'])
+        ->name('muni.org.activarInactiva');
+
 });

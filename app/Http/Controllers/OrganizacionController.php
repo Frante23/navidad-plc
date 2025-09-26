@@ -32,6 +32,14 @@ class OrganizacionController extends Controller
             return back()->withErrors(['personalidad_juridica' => 'Credenciales incorrectas'])->withInput();
         }
 
+        if (!$org || empty($org->clave) || !\Illuminate\Support\Facades\Hash::check($request->clave, $org->clave)) {
+            return back()->withErrors(['personalidad_juridica' => 'Credenciales incorrectas'])->withInput();
+        }
+
+        if ($org->estado !== 'activo') {
+            return back()->withErrors(['personalidad_juridica' => 'Tu organización no está habilitada.'])->withInput();
+        }
+
         if ($org->estado !== 'activo') {
             $msg = $org->estado === 'pendiente'
                 ? 'Tu organización aún está en revisión (pendiente). Un funcionario debe habilitarla.'

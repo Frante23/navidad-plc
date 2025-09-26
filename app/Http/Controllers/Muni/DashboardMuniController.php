@@ -458,50 +458,97 @@ class DashboardMuniController extends Controller
 
 
 
-    public function orgPendientes(Request $request)
+    public function orgPendientes()
     {
         $funcionario = auth('func')->user();
 
         $pendientes = Organizacion::where('estado','pendiente')
-            ->orderByDesc('created_at')->paginate(15, ['*'], 'pendientes_page');
+            ->orderBy('created_at','desc')->paginate(15);
 
-        $inactivas  = Organizacion::where('estado','inactivo')
-            ->orderBy('nombre')->paginate(15, ['*'], 'inactivas_page');
+        $inactivas = Organizacion::where('estado','inactivo')
+            ->orderBy('updated_at','desc')->paginate(15, ['*'], 'inactivas_page');
 
         return view('municipales.org-pendientes', compact('funcionario','pendientes','inactivas'));
     }
 
 
-    public function orgAprobar($id, Request $request)
+    public function orgAprobar(Request $request, $id)
+    {
+        $request->validate([
+            'clave' => ['required','string','min:6','confirmed'],
+        ]);
+
+        $org = Organizacion::findOrFail($id);
+        if ($org->estado !== 'pendiente') {
+            return back()->with('status','La organización ya no está en estado pendiente.');
+        }
+
+        $org->estado = 'activo';
+        $org->clave  = Hash::make($request->clave);
+        $org->save();
+
+        return back()->with('status','Organización aprobada y activada.');
+    }
+
+
+    public function orgRechazar($id)
+    {
+        $org = Organizacion::findOrFail($id);
+
+        $org->estado = 'inactivo';
+        $org->clave  = null;
+        $org->save();
+
+        return back()->with('status','Organización movida a inactivas.');
+    }
+
+    
+
+
+    public function orgDesactivar($id)
+    {
+        $org = Organizacion::findOrFail($id);
+
+        $org->estado = 'inactivo';
+        $org->clave  = null;
+        $org->save();
+
+        return back()->with('status', 'Organización desactivada y contraseña eliminada.');
+    }
+
+    public function orgReactivar($id, \Illuminate\Http\Request $request)
     {
         $data = $request->validate([
-            'clave' => ['required','string','min:6','max:255'],
+            'clave' => ['required','string','min:6','confirmed'],
         ]);
 
         $org = Organizacion::findOrFail($id);
 
-        if (!in_array($org->estado, ['pendiente','inactivo'])) {
-            return back()->with('status', 'La organización ya está activa.');
+        $org->estado = 'activo';
+        $org->clave  = Hash::make($data['clave']); 
+        $org->save();
+
+        return back()->with('status', 'Organización reactivada con nueva contraseña.');
+    }
+
+
+    public function orgActivarInactiva(Request $request, $id)
+    {
+        $request->validate([
+            'clave' => ['required','string','min:6','confirmed'],
+        ]);
+
+        $org = Organizacion::findOrFail($id);
+        if ($org->estado !== 'inactivo') {
+            return back()->with('status','La organización no está inactiva.');
         }
 
-        $org->clave  = Hash::make($data['clave']);
         $org->estado = 'activo';
+        $org->clave  = Hash::make($request->clave);
         $org->save();
 
-        return back()->with('status', "Organización «{$org->nombre}» activada.");
-    }
-
-
-    public function orgRechazar($id, Request $request)
-    {
-        $org = Organizacion::findOrFail($id);
-        $org->estado = 'inactivo';
-        $org->save();
-
-        return back()->with('status', "Organización «{$org->nombre}» marcada como inactiva.");
-    }
-
-
+        return back()->with('status','Organización reactivada correctamente.');
+}
 
 
     public function duplicados(Request $request)
