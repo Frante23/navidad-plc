@@ -9,10 +9,10 @@ class EnsureOrganizationIsAuthenticated
 {
     public function handle(Request $request, Closure $next)
     {
-        if (!$request->session()->get('organizacion_id')) {
-            return redirect('/')->with('status', 'Debes iniciar sesión.');
+        if (!session()->has('organizacion_id')) {
+            return redirect()->route('organizacion.login.form')->with('status', 'Debes iniciar sesión.');
         }
-
         return $next($request);
     }
 }
+

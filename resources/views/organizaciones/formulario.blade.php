@@ -225,8 +225,6 @@
     </script>
 
 
-
-    <!-- Lista de Beneficiarios Registrados -->
     <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-4xl">
         <h2 class="text-xl font-bold mb-4">Beneficiarios Registrados</h2>
 
@@ -236,7 +234,6 @@
             <table class="min-w-full bg-white border border-gray-300 rounded-lg shadow">
                 <thead class="bg-gray-100">
                     <tr>
-                        <th class="px-4 py-2 border">Folio (ID)</th>
                         <th class="px-4 py-2 border">Nombre Completo</th>
                         <th class="px-4 py-2 border">Fecha Nac.</th>
                         <th class="px-4 py-2 border">Edad</th>
@@ -246,18 +243,38 @@
                     </tr>
                 </thead>
                 <tbody>
-                @foreach($beneficiarios as $ben)
-                    <tr>
-                    <td class="px-4 py-2 border">{{ $ben->id }}</td>
-                    <td class="px-4 py-2 border">{{ $ben->nombre_completo }}</td>
-                    <td class="px-4 py-2 border">{{ $ben->fecha_nacimiento }}</td>
-                    {{-- Edad calculada en años (por si no existe $ben->edad) --}}
-                    <td class="px-4 py-2 border">
-                        {{ \Carbon\Carbon::parse($ben->fecha_nacimiento)->age }}
-                    </td>
-                    {{-- Si tienes accessor rut_formateado, déjalo; si no, usa $ben->rut --}}
-                    <td class="px-4 py-2 border">{{ $ben->rut_formateado ?? $ben->rut }}</td>
-                    <td class="px-4 py-2 border">{{ $ben->direccion }}</td>
+                    @php
+                        $anioPeriodo = $formulario->periodo->anio ?? now()->year;
+                        $corte = \Carbon\Carbon::create($anioPeriodo, 12, 31, 23, 59, 59);
+                    @endphp
+
+                    @foreach($beneficiarios as $ben)
+                        <tr>
+                            <td class="px-4 py-2 border">{{ $ben->nombre_completo }}</td>
+                            <td class="px-4 py-2 border">{{ $ben->fecha_nacimiento }}</td>
+                            <td class="px-4 py-2 border">
+                                @php
+                                    $fn = \Carbon\Carbon::parse($ben->fecha_nacimiento)->startOfDay();
+
+                                    if ($fn->greaterThan($corte)) {
+                                        // nació después del corte -> 0 meses/años
+                                        $meses = 0;
+                                        $anios = 0;
+                                    } else {
+                                        $iv    = $fn->diff($corte);
+                                        $meses = ($iv->y * 12) + $iv->m; // meses enteros al 31/12
+                                        $anios = $iv->y;                 // años enteros al 31/12
+                                    }
+                                @endphp
+
+                                @if($meses < 12)
+                                    {{ $meses }} {{ $meses === 1 ? 'mes' : 'meses' }}
+                                @else
+                                    {{ $anios }} {{ $anios === 1 ? 'año' : 'años' }}
+                                @endif
+                            </td>
+                            <td class="px-4 py-2 border">{{ $ben->rut_formateado ?? $ben->rut }}</td>
+                            <td class="px-4 py-2 border">{{ $ben->direccion }}</td>
 
                     <td class="px-4 py-2 border text-center">
                         @if($formulario->estado === 'abierto')
@@ -326,3 +343,5 @@
 </main>
 </body>
 </html>
+
+

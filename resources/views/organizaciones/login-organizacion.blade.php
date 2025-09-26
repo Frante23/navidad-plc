@@ -67,6 +67,15 @@
                     ¿Eres funcionario municipal? Inicia sesión aquí
                 </a>
             </div>
+
+
+            <div class="text-center mt-4">
+                <a href="{{ route('organizacion.register.form') }}" class="text-blue-600 hover:underline">
+                    ¿Aún no estás registrado? Solicita registro aquí
+                </a>
+            </div>
+
+
         </div>
     </main>
 </body>

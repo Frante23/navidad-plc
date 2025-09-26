@@ -7,6 +7,7 @@ use App\Models\Formulario;
 use App\Models\Organizacion;
 use App\Models\Periodo; 
 use App\Models\TramoEdad;
+use App\Models\TipoOrganizacion;  
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Request;
@@ -14,23 +15,30 @@ use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\FormulariosExport;
 use Dompdf\Dompdf;
 use Dompdf\Options;
+use Illuminate\Validation\Rule;
 
 class OrganizacionController extends Controller
 {
-    public function login(Request $request)
+    public function login(\Illuminate\Http\Request $request)
     {
         $request->validate([
             'personalidad_juridica' => 'required|string',
-            'clave' => 'required',
+            'clave' => 'required|string',
         ]);
 
         $org = Organizacion::where('personalidad_juridica', $request->personalidad_juridica)->first();
 
-        if (!$org || !\Illuminate\Support\Facades\Hash::check($request->clave, $org->clave)) {
+        // credenciales
+        if (!$org || !$org->clave || !Hash::check($request->clave, $org->clave)) {
             return back()->withErrors(['personalidad_juridica' => 'Credenciales incorrectas'])->withInput();
         }
 
-        // 👇 Bloquear inicio de sesión si no hay periodo abierto
+        // estado
+        if ($org->estado !== 'activo') {
+            return back()->withErrors(['personalidad_juridica' => 'Tu organización no está habilitada aún.'])->withInput();
+        }
+
+        // (opcional) exigir periodo abierto
         $periodoAbierto = Periodo::where('estado', 'abierto')->latest('anio')->first();
         if (!$periodoAbierto) {
             return back()->withErrors([
@@ -44,15 +52,16 @@ class OrganizacionController extends Controller
     }
 
 
+
     public function logout(Request $request)
     {
-        $request->session()->forget('organizacion_id');
+        $request->session()->forget(['org.id','org.nombre']);
         $request->session()->invalidate();
         $request->session()->regenerateToken();
-
         return redirect()->route('organizacion.login.form')
             ->with('cerrado', 'Sesión cerrada correctamente.');
     }
+
 
 
 
@@ -187,30 +196,36 @@ class OrganizacionController extends Controller
             'direccion'        => 'required|string',
         ]);
 
-        $edadMeses = \Carbon\Carbon::parse($request->fecha_nacimiento)->diffInMonths(now());
+        $form = \App\Models\Formulario::with('periodo')->findOrFail($request->formulario_id);
+        $anioPeriodo = $form->periodo?->anio ?? now()->year;
+        $corte = \Carbon\Carbon::create($anioPeriodo, 12, 31, 23, 59, 59);
 
-        if ($edadMeses > 11 && ($request->sexo === 'U')) {
+        $edadMeses = $this->edadEnMesesEnterosAlCorte($request->fecha_nacimiento, $corte);
+
+        $isBaby = $edadMeses < 12;
+
+        if (!$isBaby && $request->sexo === 'U') {
             return back()->withErrors([
-                'sexo' => 'Para mayores de 11 meses, seleccione Masculino o Femenino.'
+                'sexo' => 'Para mayores de 11 meses al 31/12 del período, seleccione Masculino o Femenino.'
             ])->withInput();
         }
-        $sexo = ($edadMeses <= 11) ? 'U' : ($request->sexo ?: null);
+        $sexo = $isBaby ? 'U' : ($request->sexo ?: null);
 
-        $tramo = TramoEdad::where('edad_min_meses', '<=', $edadMeses)
+        $tramo = \App\Models\TramoEdad::where('edad_min_meses', '<=', $edadMeses)
             ->where('edad_max_meses', '>=', $edadMeses)
             ->first();
 
         if (!$tramo) {
             return back()->withErrors([
-                'edad' => "No existe un tramo de edad para este beneficiario."
+                'edad' => "No existe un tramo de edad para este beneficiario (edad {$edadMeses} meses al 31/12/{$anioPeriodo})."
             ])->withInput();
         }
 
-        Beneficiario::create([
+        \App\Models\Beneficiario::create([
             'rut'              => $rutLimpio,
             'nombre_completo'  => $request->nombre_completo,
             'fecha_nacimiento' => $request->fecha_nacimiento,
-            'sexo'             => $sexo, 
+            'sexo'             => $sexo,
             'direccion'        => $request->direccion,
             'formulario_id'    => $request->formulario_id,
             'organizacion_id'  => session('organizacion_id'),
@@ -218,7 +233,92 @@ class OrganizacionController extends Controller
         ]);
 
         return redirect()->route('formulario.show')
-                        ->with('success_ben', 'Beneficiario registrado correctamente.');
+            ->with('success_ben', 'Beneficiario registrado correctamente.');
+    }
+
+
+    public function update(Request $request, $id)
+    {
+        $beneficiario = \App\Models\Beneficiario::findOrFail($id);
+        if ($beneficiario->organizacion_id !== session('organizacion_id')) {
+            abort(403, 'No autorizado');
+        }
+
+        $rutLimpio = $this->cleanRut($request->input('rut', ''));
+        if (!$this->validateRut($rutLimpio)) {
+            return back()->withErrors(['rut' => "RUT inválido: $rutLimpio"])->withInput();
+        }
+
+        $request->validate([
+            'nombre_completo'  => 'required|string',
+            'fecha_nacimiento' => 'required|date',
+            'sexo'             => 'nullable|in:M,F,U',
+            'direccion'        => 'required|string',
+        ]);
+
+        $form = \App\Models\Formulario::with('periodo')->findOrFail($beneficiario->formulario_id);
+        $anioPeriodo = $form->periodo?->anio ?? now()->year;
+        $corte = \Carbon\Carbon::create($anioPeriodo, 12, 31, 23, 59, 59);
+
+        $edadMeses = $this->edadEnMesesEnterosAlCorte($request->fecha_nacimiento, $corte);
+        $isBaby    = $edadMeses < 12;
+
+        if (!$isBaby && $request->sexo === 'U') {
+            return back()->withErrors([
+                'sexo' => 'Para mayores de 11 meses al 31/12 del período, seleccione Masculino o Femenino.'
+            ])->withInput();
+        }
+        $sexo = $isBaby ? 'U' : ($request->sexo ?: null);
+
+        $tramo = \App\Models\TramoEdad::where('edad_min_meses', '<=', $edadMeses)
+            ->where('edad_max_meses', '>=', $edadMeses)
+            ->first();
+
+        if (!$tramo) {
+            return back()->withErrors([
+                'edad' => "No existe un tramo de edad para este beneficiario (edad {$edadMeses} meses al 31/12/{$anioPeriodo})."
+            ])->withInput();
+        }
+
+        $beneficiario->rut              = $rutLimpio;
+        $beneficiario->nombre_completo  = $request->nombre_completo;
+        $beneficiario->fecha_nacimiento = $request->fecha_nacimiento;
+        $beneficiario->sexo             = $sexo;
+        $beneficiario->direccion        = $request->direccion;
+        $beneficiario->tramo_id         = $tramo->id;
+        $beneficiario->save();
+
+        return redirect()
+            ->route('formularios.show', $beneficiario->formulario_id)
+            ->with('success_ben', 'Beneficiario actualizado correctamente.');
+    }
+
+
+
+
+
+
+    private function edadEnMesesEnteros(string $fecha): int
+    {
+        $fn  = \Carbon\Carbon::parse($fecha)->startOfDay();
+        $now = \Carbon\Carbon::now()->startOfDay();
+
+        $iv = $fn->diff($now); 
+        return ($iv->y * 12) + $iv->m;
+    }
+
+
+    private function edadEnMesesEnterosAlCorte(string $fechaNac, \Carbon\Carbon $corte): int
+    {
+        $fn   = \Carbon\Carbon::parse($fechaNac)->startOfDay();
+        $corte = $corte->copy()->startOfDay();
+
+        if ($fn->greaterThan($corte)) {
+            return 0; 
+        }
+
+        $iv = $fn->diff($corte); 
+        return ($iv->y * 12) + $iv->m;
     }
 
 
@@ -238,11 +338,45 @@ class OrganizacionController extends Controller
     }
 
 
+    public function showRegisterForm()
+    {
+        $tipos = TipoOrganizacion::orderBy('nombre')->get();
+        return view('organizaciones.register', compact('tipos'));
+    }
+
+
+    public function register(\Illuminate\Http\Request $request)
+    {
+        $data = $request->validate([
+            'tipo_organizacion_id'  => ['required','exists:tipos_organizaciones,id'],
+            'nombre'                => ['required','string','max:255'],
+            'personalidad_juridica' => ['required','string','max:100','unique:organizaciones,personalidad_juridica'],
+            'domicilio_despacho'    => ['nullable','string','max:255'],
+            'email'                 => ['nullable','email','max:255','unique:organizaciones,email'],
+            'nombre_representante'  => ['nullable','string','max:255'],
+            'telefono_contacto'     => ['nullable','string','max:50'],
+            'observacion'           => ['nullable','string'],
+            'fecha_creacion'        => ['nullable','date'],
+        ]);
+
+        $org = new Organizacion();
+        $org->fill($data);
+        $org->estado = 'pendiente';
+        $org->clave  = null;    
+        $org->save();
+
+        return redirect()->route('organizacion.register.form')
+            ->with('status', 'Registro enviado. Un funcionario municipal revisará y habilitará tu acceso.');
+    }
+
 
 
 
     public function showLoginForm()
     {
+        if (session()->has('org.id')) {
+            return redirect()->route('panel.inicio');
+        }
         return view('organizaciones.login-organizacion');
     }
 
@@ -272,57 +406,6 @@ class OrganizacionController extends Controller
     }
 
 
-    public function update(Request $request, $id)
-    {
-        $beneficiario = Beneficiario::findOrFail($id);
-
-        if ($beneficiario->organizacion_id !== session('organizacion_id')) {
-            abort(403, 'No autorizado');
-        }
-
-        $rutLimpio = $this->cleanRut($request->input('rut', ''));
-        if (!$this->validateRut($rutLimpio)) {
-            return back()->withErrors(['rut' => "RUT inválido: $rutLimpio"])->withInput();
-        }
-
-        $request->validate([
-            'nombre_completo'  => 'required|string',
-            'fecha_nacimiento' => 'required|date',
-            'sexo'             => 'nullable|in:M,F,U',
-            'direccion'        => 'required|string',
-        ]);
-
-        $edadMeses = \Carbon\Carbon::parse($request->fecha_nacimiento)->diffInMonths(now());
-
-        if ($edadMeses > 11 && ($request->sexo === 'U')) {
-            return back()->withErrors([
-                'sexo' => 'Para mayores de 11 meses, seleccione Masculino o Femenino.'
-            ])->withInput();
-        }
-        $sexo = ($edadMeses <= 11) ? 'U' : ($request->sexo ?: null);
-
-        $tramo = TramoEdad::where('edad_min_meses', '<=', $edadMeses)
-            ->where('edad_max_meses', '>=', $edadMeses)
-            ->first();
-
-        if (!$tramo) {
-            return back()->withErrors([
-                'edad' => 'No existe un tramo de edad para este beneficiario.'
-            ])->withInput();
-        }
-
-        $beneficiario->rut              = $rutLimpio;
-        $beneficiario->nombre_completo  = $request->nombre_completo;
-        $beneficiario->fecha_nacimiento = $request->fecha_nacimiento;
-        $beneficiario->sexo             = $sexo; 
-        $beneficiario->direccion        = $request->direccion;
-        $beneficiario->tramo_id         = $tramo->id;
-        $beneficiario->save();
-
-        return redirect()
-            ->route('formularios.show', $beneficiario->formulario_id)
-            ->with('success_ben', 'Beneficiario actualizado correctamente.');
-    }
 
 
     public function destroy($id)

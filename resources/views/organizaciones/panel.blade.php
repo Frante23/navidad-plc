@@ -82,7 +82,7 @@
                 <td class="px-4 py-3 text-right">
                   <a href="{{ route('formularios.show', $form->id) }}"
                      class="text-sm font-medium text-indigo-600 hover:text-indigo-800">
-                    Abrir
+                    Ver
                   </a>
                 </td>
               </tr>

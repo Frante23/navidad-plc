@@ -16,7 +16,6 @@ use Dompdf\Options;
 use Illuminate\Support\Facades\Hash;  
 
 
-
 class DashboardMuniController extends Controller
 {
     public function index(Request $request)
@@ -412,6 +411,48 @@ class DashboardMuniController extends Controller
 
 
 
+
+
+    public function orgPendientes()
+    {
+        $funcionario = auth('func')->user();
+        $pendientes = Organizacion::where('estado','pendiente')->orderBy('created_at','asc')->paginate(20);
+
+        return view('municipales.org-pendientes', compact('funcionario','pendientes'));
+    }
+
+
+    public function orgAprobar($id, \Illuminate\Http\Request $request)
+    {
+        $data = $request->validate([
+            'clave' => ['required','string','min:6','max:255','confirmed'], // requiere clave + clave_confirmation
+        ]);
+
+        $org = Organizacion::findOrFail($id);
+        if ($org->estado !== 'pendiente') {
+            return back()->with('status','La organización ya no está pendiente.');
+        }
+
+        $org->clave  = Hash::make($data['clave']);
+        $org->estado = 'activo';
+        $org->save();
+
+        return back()->with('status','Organización habilitada y contraseña asignada.');
+    }
+
+
+    public function orgRechazar($id)
+    {
+        $org = Organizacion::findOrFail($id);
+        $org->estado = 'inactivo';
+        $org->save();
+
+        return back()->with('status','Organización rechazada.');
+    }
+
+
+
+
     public function duplicados(Request $request)
     {
         $funcionario = auth('func')->user();
@@ -419,7 +460,6 @@ class DashboardMuniController extends Controller
 
         $periodos = \App\Models\Periodo::orderByDesc('anio')->get();
 
-        // Busca beneficiarios con RUT repetido (dentro del período si se selecciona)
         $base = \DB::table('beneficiarios as b')
             ->join('formularios as f','f.id','=','b.formulario_id')
             ->join('organizaciones as o','o.id','=','b.organizacion_id')
