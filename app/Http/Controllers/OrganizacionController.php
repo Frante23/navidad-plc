@@ -19,27 +19,27 @@ use Illuminate\Validation\Rule;
 
 class OrganizacionController extends Controller
 {
-    public function login(\Illuminate\Http\Request $request)
+    public function login(Request $request)
     {
         $request->validate([
             'personalidad_juridica' => 'required|string',
-            'clave' => 'required|string',
+            'clave' => 'required',
         ]);
 
-        $org = Organizacion::where('personalidad_juridica', $request->personalidad_juridica)->first();
+        $org = \App\Models\Organizacion::where('personalidad_juridica', $request->personalidad_juridica)->first();
 
-        // credenciales
-        if (!$org || !$org->clave || !Hash::check($request->clave, $org->clave)) {
+        if (!$org || !\Illuminate\Support\Facades\Hash::check($request->clave, $org->clave)) {
             return back()->withErrors(['personalidad_juridica' => 'Credenciales incorrectas'])->withInput();
         }
 
-        // estado
         if ($org->estado !== 'activo') {
-            return back()->withErrors(['personalidad_juridica' => 'Tu organización no está habilitada aún.'])->withInput();
+            $msg = $org->estado === 'pendiente'
+                ? 'Tu organización aún está en revisión (pendiente). Un funcionario debe habilitarla.'
+                : 'Tu organización está inactiva. Contacta a la Municipalidad.';
+            return back()->withErrors(['personalidad_juridica' => $msg])->withInput();
         }
 
-        // (opcional) exigir periodo abierto
-        $periodoAbierto = Periodo::where('estado', 'abierto')->latest('anio')->first();
+        $periodoAbierto = \App\Models\Periodo::where('estado', 'abierto')->latest('anio')->first();
         if (!$periodoAbierto) {
             return back()->withErrors([
                 'msg' => 'La inscripción está cerrada actualmente. Intente más tarde o contacte a la Municipalidad.'
@@ -50,6 +50,7 @@ class OrganizacionController extends Controller
 
         return redirect()->route('panel.inicio');
     }
+
 
 
 
@@ -368,7 +369,6 @@ class OrganizacionController extends Controller
         return redirect()->route('organizacion.register.form')
             ->with('status', 'Registro enviado. Un funcionario municipal revisará y habilitará tu acceso.');
     }
-
 
 
 

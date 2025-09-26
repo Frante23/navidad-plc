@@ -25,7 +25,6 @@
     <a href="{{ route('muni.org.pendientes') }}"
       class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-50
               {{ request()->routeIs('muni.org.pendientes') ? 'bg-gray-100 font-semibold' : '' }}">
-      {{-- iconito --}}
       <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
               d="M9 12h6m2 0a8 8 0 10-16 0 8 8 0 0016 0z" />

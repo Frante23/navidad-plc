@@ -23,19 +23,62 @@ class DashboardMuniController extends Controller
         $funcionario = auth('func')->user();
 
         $q          = trim($request->get('q', ''));
-        $periodoSel = $request->integer('periodo_id'); 
+        $periodoSel = $request->integer('periodo_id');
+        $estadoSel  = $request->get('estado'); 
+        $sort       = $request->get('sort', 'nombre');
+        $direction  = strtolower($request->get('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
 
         $periodos = Periodo::orderByDesc('anio')->get();
         $tramos   = TramoEdad::orderBy('edad_min_meses')->get();
 
         $orgsQuery = Organizacion::query()
+            ->select('organizaciones.*')
             ->when($q, function ($qq) use ($q) {
                 $qq->where(function ($w) use ($q) {
                     $w->where('nombre', 'like', "%{$q}%")
-                      ->orWhere('personalidad_juridica', 'like', "%{$q}%");
+                    ->orWhere('personalidad_juridica', 'like', "%{$q}%");
                 });
             })
-            ->orderBy('nombre');
+            ->when(isset($estadoSel) && $estadoSel !== '', function ($qq) use ($estadoSel) {
+                $qq->where('organizaciones.estado', $estadoSel);
+            });
+
+        $sortableNative = ['nombre', 'personalidad_juridica', 'estado', 'created_at', 'updated_at'];
+
+        if (in_array($sort, $sortableNative, true)) {
+            $orgsQuery->orderBy($sort, $direction);
+        }
+
+        elseif ($sort === 'beneficiarios') {
+            $subBen = \DB::table('beneficiarios as b')
+                ->selectRaw('b.organizacion_id, COUNT(*) as ben_count')
+                ->join('formularios as f', 'f.id', '=', 'b.formulario_id')
+                ->when($periodoSel, fn($qq) => $qq->where('f.periodo_id', $periodoSel))
+                ->groupBy('b.organizacion_id');
+
+            $orgsQuery
+                ->leftJoinSub($subBen, 'benc', function ($join) {
+                    $join->on('organizaciones.id', '=', 'benc.organizacion_id');
+                })
+                ->orderByRaw('COALESCE(benc.ben_count, 0) ' . $direction);
+        }
+
+        elseif ($sort === 'formularios') {
+            $subForm = \DB::table('formularios as f')
+                ->selectRaw('f.organizacion_id, COUNT(*) as form_count')
+                ->when($periodoSel, fn($qq) => $qq->where('f.periodo_id', $periodoSel))
+                ->groupBy('f.organizacion_id');
+
+            $orgsQuery
+                ->leftJoinSub($subForm, 'formc', function ($join) {
+                    $join->on('organizaciones.id', '=', 'formc.organizacion_id');
+                })
+                ->orderByRaw('COALESCE(formc.form_count, 0) ' . $direction);
+        }
+
+        else {
+            $orgsQuery->orderBy('nombre', 'asc');
+        }
 
         $organizaciones = $orgsQuery->paginate(10)->withQueryString();
 
@@ -64,9 +107,11 @@ class DashboardMuniController extends Controller
             ->pluck('c','organizacion_id');
 
         return view('municipales.dashboard', compact(
-            'funcionario','organizaciones','periodos','periodoSel','tramos','formStats','benByTramo','benTotals','q'
+            'funcionario','organizaciones','periodos','periodoSel','tramos',
+            'formStats','benByTramo','benTotals','q','estadoSel','sort','direction'
         ));
     }
+
 
     public function showOrg($id, Request $request)
     {
@@ -413,41 +458,47 @@ class DashboardMuniController extends Controller
 
 
 
-    public function orgPendientes()
+    public function orgPendientes(Request $request)
     {
         $funcionario = auth('func')->user();
-        $pendientes = Organizacion::where('estado','pendiente')->orderBy('created_at','asc')->paginate(20);
 
-        return view('municipales.org-pendientes', compact('funcionario','pendientes'));
+        $pendientes = Organizacion::where('estado','pendiente')
+            ->orderByDesc('created_at')->paginate(15, ['*'], 'pendientes_page');
+
+        $inactivas  = Organizacion::where('estado','inactivo')
+            ->orderBy('nombre')->paginate(15, ['*'], 'inactivas_page');
+
+        return view('municipales.org-pendientes', compact('funcionario','pendientes','inactivas'));
     }
 
 
-    public function orgAprobar($id, \Illuminate\Http\Request $request)
+    public function orgAprobar($id, Request $request)
     {
         $data = $request->validate([
-            'clave' => ['required','string','min:6','max:255','confirmed'], // requiere clave + clave_confirmation
+            'clave' => ['required','string','min:6','max:255'],
         ]);
 
         $org = Organizacion::findOrFail($id);
-        if ($org->estado !== 'pendiente') {
-            return back()->with('status','La organización ya no está pendiente.');
+
+        if (!in_array($org->estado, ['pendiente','inactivo'])) {
+            return back()->with('status', 'La organización ya está activa.');
         }
 
         $org->clave  = Hash::make($data['clave']);
         $org->estado = 'activo';
         $org->save();
 
-        return back()->with('status','Organización habilitada y contraseña asignada.');
+        return back()->with('status', "Organización «{$org->nombre}» activada.");
     }
 
 
-    public function orgRechazar($id)
+    public function orgRechazar($id, Request $request)
     {
         $org = Organizacion::findOrFail($id);
         $org->estado = 'inactivo';
         $org->save();
 
-        return back()->with('status','Organización rechazada.');
+        return back()->with('status', "Organización «{$org->nombre}» marcada como inactiva.");
     }
 
 
@@ -482,6 +533,23 @@ class DashboardMuniController extends Controller
 
         return view('municipales.duplicados', compact('funcionario','rows','periodos','periodoSel'));
     }
+
+
+
+
+    public function setOrgStatus($id, Request $request)
+    {
+        $request->validate([
+            'estado' => 'required|in:activo,pendiente,inactivo',
+        ]);
+
+        $org = \App\Models\Organizacion::findOrFail($id);
+        $org->estado = $request->estado;
+        $org->save();
+
+        return back()->with('status', "Estado de «{$org->nombre}» actualizado a {$org->estado}.");
+    }
+
 
 
     

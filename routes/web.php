@@ -70,4 +70,8 @@ Route::middleware('auth:func')->group(function () {
     Route::get('/muni/pendientes', [DashboardMuniController::class, 'orgPendientes'])->name('muni.org.pendientes');
     Route::post('/muni/pendientes/{id}/aprobar', [DashboardMuniController::class, 'orgAprobar'])->name('muni.org.aprobar');
     Route::post('/muni/pendientes/{id}/rechazar', [DashboardMuniController::class, 'orgRechazar'])->name('muni.org.rechazar');
+
+
+    Route::post('/muni/organizacion/{id}/status', [DashboardMuniController::class, 'setOrgStatus'])
+        ->name('muni.org.setStatus');
 });
