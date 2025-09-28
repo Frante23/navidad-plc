@@ -20,6 +20,10 @@ class Beneficiario extends Model
         'formulario_id',
         'organizacion_id',
         'tramo_id',
+        'rut_jefe_hogar',
+        'porcentaje_rsh',
+        'observaciones',
+        'aceptado',
     ];
 
     public function getRutFormateadoAttribute()
@@ -46,5 +50,9 @@ class Beneficiario extends Model
     public function getEdadAttribute()
     {
         return \Carbon\Carbon::parse($this->fecha_nacimiento)->age;
+    }
+    public function tramo()
+    { 
+        return $this->belongsTo(TramoEdad::class, 'tramo_id'); 
     }
 }

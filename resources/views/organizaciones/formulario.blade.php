@@ -157,6 +157,13 @@
                 <input type="text" name="direccion" class="w-full border rounded p-2" required>
             </div>
 
+            <div>
+                <label>RUT Jefe de Hogar</label>
+                <input type="text" name="rut_jefe_hogar" class="w-full border rounded p-2" required>
+                <small class="text-xs text-gray-500">Se aceptan formato 12.345.678-9 o 12345678-9</small>
+            </div>
+
+
             <button type="submit" class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">
                 Registrar Beneficiario
             </button>

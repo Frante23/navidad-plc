@@ -201,6 +201,9 @@ class OrganizacionController extends Controller
             'fecha_nacimiento'  => 'required|date',
             'sexo'              => 'nullable|in:M,F,U',
             'direccion'         => 'required|string|max:255',
+            'rut_jefe_hogar'    => ['required','string','max:20'],
+            'porcentaje_rsh'    => ['nullable','integer','between:0,100'],
+            'observaciones'     => ['nullable','string'],
         ]);
 
         $orgId = session('organizacion_id');
@@ -283,6 +286,7 @@ class OrganizacionController extends Controller
             'formulario_id'    => $data['formulario_id'],
             'organizacion_id'  => $orgId,
             'tramo_id'         => $tramo->id,
+            'rut_jefe_hogar'   => $request->rut_jefe_hogar,
         ]);
 
         return back()->with('success_ben','Beneficiario registrado.');

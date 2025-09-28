@@ -113,24 +113,35 @@ class DashboardMuniController extends Controller
     }
 
 
-    public function showOrg($id, Request $request)
+    public function showOrg(Request $request, int $id)
     {
         $funcionario = auth('func')->user();
+        $org = \App\Models\Organizacion::findOrFail($id);
+
+        $periodos   = \App\Models\Periodo::orderBy('anio','desc')->get();
         $periodoSel = $request->integer('periodo_id');
 
-        $org = Organizacion::findOrFail($id);
-
-        $formularios = Formulario::withCount('beneficiarios')
-            ->when($periodoSel, fn($qq)=>$qq->where('periodo_id', $periodoSel))
-            ->where('organizacion_id',$org->id)
+        $formularios = \App\Models\Formulario::with('periodo')
+            ->withCount('beneficiarios')
+            ->where('organizacion_id', $org->id)
+            ->when($periodoSel, fn($q) => $q->where('periodo_id', $periodoSel))
             ->orderByDesc('id')
             ->paginate(10)
-            ->withQueryString();
+            ->appends($request->query());
 
-        $periodos = Periodo::orderByDesc('anio')->get();
+        $beneficiarios = \App\Models\Beneficiario::where('organizacion_id', $org->id)
+            ->when($periodoSel, function($q) use ($periodoSel) {
+                $q->whereHas('formulario', fn($qq) => $qq->where('periodo_id', $periodoSel));
+            })
+            ->orderByDesc('id')
+            ->paginate(15)
+            ->appends($request->query());
 
-        return view('municipales.org-show', compact('funcionario','org','formularios','periodos','periodoSel'));
+        return view('municipales.org-show', compact(
+            'funcionario', 'org', 'periodos', 'periodoSel', 'formularios', 'beneficiarios'
+        ));
     }
+
 
 
     public function exportCsv(Request $request)
@@ -164,6 +175,10 @@ class DashboardMuniController extends Controller
                 b.fecha_nacimiento,
                 b.sexo,
                 b.direccion,
+                b.rut_jefe_hogar,
+                b.porcentaje_rsh,
+                b.aceptado,
+                b.observaciones,
                 t.nombre_tramo,
                 b.created_at AS beneficiario_creado
             ")
@@ -203,66 +218,78 @@ class DashboardMuniController extends Controller
 
     private function buildRows(?int $periodoId, ?string $q)
     {
-        $orgIds = \App\Models\Organizacion::when($q, function ($qq) use ($q) {
-                $qq->where(function ($w) use ($q) {
-                    $w->where('nombre', 'like', "%{$q}%")
-                      ->orWhere('personalidad_juridica', 'like', "%{$q}%");
-                });
-            })->pluck('id');
+        $orgIds = Organizacion::when($q, function ($qq) use ($q) {
+            $qq->where(function ($w) use ($q) {
+                $w->where('nombre', 'like', "%{$q}%")
+                ->orWhere('personalidad_juridica', 'like', "%{$q}%");
+            });
+        })->pluck('id');
 
         return DB::table('beneficiarios as b')
             ->join('formularios as f', 'f.id','=','b.formulario_id')
             ->join('organizaciones as o', 'o.id','=','b.organizacion_id')
-            ->leftJoin('tramos_edad as t', 't.id','=','b.tramo_id')
+            ->leftJoin('tramos_edad as t', 't.id','=','b.tramo_id') 
             ->leftJoin('periodos as p', 'p.id','=','f.periodo_id')
             ->when($periodoId, fn($qq)=>$qq->where('f.periodo_id', $periodoId))
             ->whereIn('b.organizacion_id', $orgIds)
-            ->selectRaw("
-                o.nombre AS organizacion,
-                o.personalidad_juridica AS pj,
-                f.id AS formulario_id,
-                f.estado AS formulario_estado,
-                p.anio AS periodo_anio,
-                b.id AS beneficiario_id,
-                b.rut,
-                b.nombre_completo,
-                b.fecha_nacimiento,
-                b.sexo,
-                b.direccion,
-                t.nombre_tramo,
-                b.created_at AS beneficiario_creado
-            ")
+            ->select([
+                'o.nombre                 as organizacion',
+                'o.personalidad_juridica  as pj',
+                'f.id                     as formulario_id',
+                'f.estado                 as formulario_estado',
+                'p.anio                   as periodo_anio',
+                'b.id                     as beneficiario_id',
+                'b.rut',
+                'b.nombre_completo',
+                'b.fecha_nacimiento',
+                'b.sexo',
+                'b.direccion',
+                't.nombre_tramo           as nombre_tramo',  
+                'b.created_at             as beneficiario_creado',
+                'b.rut_jefe_hogar',
+                'b.porcentaje_rsh',
+                'b.observaciones',
+                'b.aceptado',
+            ])
             ->orderBy('o.nombre')->orderBy('f.id')->orderBy('b.id')
             ->get();
     }
+
+
 
     private function buildOrgRows(int $orgId, ?int $periodoId)
     {
         return DB::table('beneficiarios as b')
             ->join('formularios as f', 'f.id','=','b.formulario_id')
             ->join('organizaciones as o', 'o.id','=','b.organizacion_id')
-            ->leftJoin('tramos_edad as t', 't.id','=','b.tramo_id')
+            ->leftJoin('tramos_edad as t', 't.id','=','b.tramo_id')   
             ->leftJoin('periodos as p', 'p.id','=','f.periodo_id')
             ->where('b.organizacion_id', $orgId)
             ->when($periodoId, fn($qq)=>$qq->where('f.periodo_id', $periodoId))
-            ->selectRaw("
-                o.nombre AS organizacion,
-                o.personalidad_juridica AS pj,
-                f.id AS formulario_id,
-                f.estado AS formulario_estado,
-                p.anio AS periodo_anio,
-                b.id AS beneficiario_id,
-                b.rut,
-                b.nombre_completo,
-                b.fecha_nacimiento,
-                b.sexo,
-                b.direccion,
-                t.nombre_tramo,
-                b.created_at AS beneficiario_creado
-            ")
+            ->select([
+                'o.nombre                 as organizacion',
+                'o.personalidad_juridica  as pj',
+                'f.id                     as formulario_id',
+                'f.estado                 as formulario_estado',
+                'p.anio                   as periodo_anio',
+                'b.id                     as beneficiario_id',
+                'b.rut',
+                'b.nombre_completo',
+                'b.fecha_nacimiento',
+                'b.sexo',
+                'b.direccion',
+                't.nombre_tramo           as nombre_tramo',  
+                'b.created_at             as beneficiario_creado',
+                'b.rut_jefe_hogar',
+                'b.porcentaje_rsh',
+                'b.observaciones',
+                'b.aceptado',
+            ])
             ->orderBy('f.id')->orderBy('b.id')
             ->get();
     }
+
+
 
 
     public function exportXlsx(Request $request)
@@ -275,39 +302,46 @@ class DashboardMuniController extends Controller
             'Content-Disposition' => "attachment; filename=\"$filename\"",
         ];
 
-        $html = view('municipales.exports.table-xls', ['rows' => $rows])->render();
+        $html = view('municipales.exports.table-xls', [
+            'rows'   => $rows,
+            'titulo' => 'Exportación agrupada',
+        ])->render();
+
         return response($html, 200, $headers);
     }
 
+
     public function exportPdf(Request $request)
-        {
-            $rows = $this->buildRows($request->integer('periodo_id'), trim($request->get('q','')));
+    {
+        $rows = $this->buildRows($request->integer('periodo_id'), trim($request->get('q','')));
 
-            if (!class_exists(Options::class)) {
-                return back()->with('status','PDF no disponible (falta dompdf). Usa Excel.');
-            }
+        $html = view('municipales.exports.table-pdf', [
+            'rows'   => $rows,
+            'titulo' => 'Exportación agrupada'
+        ])->render();
 
-            $html = view('municipales.exports.table-pdf', ['rows' => $rows, 'titulo' => 'Exportación agrupada'])->render();
+        $options = new Options();
+        $options->set('isRemoteEnabled', true);
+        $options->set('defaultFont', 'DejaVu Sans');
 
-            $options = new Options();
-            $options->set('isRemoteEnabled', true);
-            $options->set('defaultFont', 'DejaVu Sans');
-            $dompdf = new Dompdf($options);
-            $dompdf->loadHtml($html, 'UTF-8');
-            $dompdf->setPaper('A4','landscape');
-            $dompdf->render();
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4', 'landscape');
+        $dompdf->render();
 
-            $filename = 'muni_export_'.now()->format('Ymd_His').'.pdf';
-            return response($dompdf->output(), 200, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => "attachment; filename=\"$filename\"",
-            ]);
-        }
+        $filename = 'muni_export_'.now()->format('Ymd_His').'.pdf';
+        return response($dompdf->output(), 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => "attachment; filename=\"$filename\"",
+        ]);
+    }
+
 
 
         public function exportOrgXlsx($id, Request $request)
         {
             $rows = $this->buildOrgRows((int)$id, $request->integer('periodo_id'));
+            $org  = \App\Models\Organizacion::findOrFail($id);
 
             $filename = 'org_'.$id.'_export_'.now()->format('Ymd_His').'.xls';
             $headers = [
@@ -315,19 +349,20 @@ class DashboardMuniController extends Controller
                 'Content-Disposition' => "attachment; filename=\"$filename\"",
             ];
 
-            $html = view('municipales.exports.table-xls', ['rows' => $rows])->render();
+            $html = view('municipales.exports.table-xls', [
+                'rows'   => $rows,
+                'titulo' => 'Organización: '.$org->nombre.' ('.$org->personalidad_juridica.')',
+            ])->render();
+
             return response($html, 200, $headers);
         }
+
 
         public function exportOrgPdf($id, Request $request)
         {
             $rows = $this->buildOrgRows((int)$id, $request->integer('periodo_id'));
+            $org  = Organizacion::findOrFail($id);
 
-            if (!class_exists(Options::class)) {
-                return back()->with('status','PDF no disponible (falta dompdf). Usa Excel.');
-            }
-
-            $org = \App\Models\Organizacion::findOrFail($id);
             $html = view('municipales.exports.table-pdf', [
                 'rows'   => $rows,
                 'titulo' => 'Organización: '.$org->nombre.' ('.$org->personalidad_juridica.')'
@@ -336,17 +371,19 @@ class DashboardMuniController extends Controller
             $options = new Options();
             $options->set('isRemoteEnabled', true);
             $options->set('defaultFont', 'DejaVu Sans');
+
             $dompdf = new Dompdf($options);
             $dompdf->loadHtml($html, 'UTF-8');
-            $dompdf->setPaper('A4','landscape');
+            $dompdf->setPaper('A4', 'landscape');
             $dompdf->render();
 
             $filename = 'org_'.$id.'_export_'.now()->format('Ymd_His').'.pdf';
             return response($dompdf->output(), 200, [
-                'Content-Type' => 'application/pdf',
+                'Content-Type'        => 'application/pdf',
                 'Content-Disposition' => "attachment; filename=\"$filename\"",
             ]);
         }
+
 
 
 
@@ -377,47 +414,111 @@ class DashboardMuniController extends Controller
                 ->get();
         }
 
-        public function exportFormXlsx($id)
+        public function exportFormXlsx(int $id)
         {
-            $rows = $this->buildFormRows((int)$id);
+            $form = \App\Models\Formulario::with('periodo','organizacion')->findOrFail($id);
 
-            $filename = 'formulario_'.$id.'_'.now()->format('Ymd_His').'.xls';
-            $headers = [
-                'Content-Type'        => 'application/vnd.ms-excel; charset=UTF-8',
-                'Content-Disposition' => "attachment; filename=\"$filename\"",
-            ];
+            $rows = DB::table('beneficiarios as b')
+                ->join('formularios as f', 'f.id', '=', 'b.formulario_id')
+                ->join('organizaciones as o', 'o.id', '=', 'b.organizacion_id')
+                ->leftJoin('tramos_edad as t', 't.id', '=', 'b.tramo_id')
+                ->where('b.formulario_id', $id)
+                ->select([
+                    'o.nombre                 as organizacion',
+                    'o.personalidad_juridica  as pj',
+                    'f.id                     as formulario_id',
+                    'f.estado                 as formulario_estado',
+                    'f.periodo_id',
+                    'b.id                     as beneficiario_id',   
+                    'b.rut',
+                    'b.nombre_completo',
+                    'b.fecha_nacimiento',
+                    'b.sexo',
+                    'b.direccion',
+                    't.nombre_tramo           as nombre_tramo',
+                    'b.created_at             as beneficiario_creado',
+                    'b.rut_jefe_hogar',
+                    'b.porcentaje_rsh',
+                    'b.observaciones',
+                    'b.aceptado',
+                ])
+                ->orderBy('b.id')
+                ->get()
+                ->map(function ($r) use ($form) {
+                    $r->periodo_anio = $form->periodo?->anio;
+                    return $r;
+                });
 
-            $html = view('municipales.exports.table-xls', compact('rows'))->render();
-            return response($html, 200, $headers);
+            return response()->view('municipales.exports.table-xls', [
+                'rows'   => $rows,
+                'titulo' => 'Formulario #'.$form->id.' – '.$form->organizacion?->nombre,
+            ])->header('Content-Type', 'application/vnd.ms-excel; charset=UTF-8')
+            ->header('Content-Disposition', 'attachment; filename="formulario_'.$form->id.'.xls"');
         }
 
-        public function exportFormPdf($id)
+
+
+
+
+
+
+        public function exportFormPdf(int $id)
         {
-            $rows = $this->buildFormRows((int)$id);
+            $form = \App\Models\Formulario::with('periodo','organizacion')->findOrFail($id);
 
-            if (!class_exists(Options::class)) {
-                return back()->with('status','PDF no disponible (falta dompdf). Usa Excel.');
-            }
+            $rows = DB::table('beneficiarios as b')
+                ->join('formularios as f', 'f.id', '=', 'b.formulario_id')
+                ->join('organizaciones as o', 'o.id', '=', 'b.organizacion_id')
+                ->leftJoin('tramos_edad as t', 't.id', '=', 'b.tramo_id')
+                ->where('b.formulario_id', $id)
+                ->select([
+                    'o.nombre                 as organizacion',
+                    'o.personalidad_juridica  as pj',
+                    'f.id                     as formulario_id',
+                    'f.periodo_id',
+                    'b.rut',
+                    'b.nombre_completo',
+                    'b.fecha_nacimiento',
+                    'b.sexo',
+                    'b.direccion',
+                    't.nombre_tramo           as nombre_tramo',   
+                    'b.created_at             as beneficiario_creado',
+                    'b.rut_jefe_hogar',
+                    'b.porcentaje_rsh',
+                    'b.observaciones',
+                    'b.aceptado',
+                ])
+                ->orderBy('b.id')
+                ->get()
+                ->map(function ($r) use ($form) {
+                    $r->periodo_anio = $form->periodo?->anio;
+                    return $r;
+                });
 
-            $html = view('municipales.exports.table-pdf', [
-                'rows'   => $rows,
-                'titulo' => 'Formulario #'.$id
-            ])->render();
-
-            $options = new Options();
+            $options = new \Dompdf\Options();
             $options->set('isRemoteEnabled', true);
             $options->set('defaultFont', 'DejaVu Sans');
-            $dompdf = new Dompdf($options);
+
+            $dompdf = new \Dompdf\Dompdf($options);
+            $html   = view('municipales.exports.table-pdf', [
+                'titulo' => 'Formulario #'.$form->id.' – '.$form->organizacion?->nombre,
+                'rows'   => $rows,
+            ])->render();
+
             $dompdf->loadHtml($html, 'UTF-8');
-            $dompdf->setPaper('A4','landscape');
+            $dompdf->setPaper('A4', 'landscape');
             $dompdf->render();
 
-            $filename = 'formulario_'.$id.'_'.now()->format('Ymd_His').'.pdf';
             return response($dompdf->output(), 200, [
                 'Content-Type'        => 'application/pdf',
-                'Content-Disposition' => "attachment; filename=\"$filename\"",
+                'Content-Disposition' => 'attachment; filename="formulario_'.$form->id.'.pdf"',
             ]);
         }
+
+
+
+
+
 
     public function createOrg()
     {
@@ -610,6 +711,56 @@ class DashboardMuniController extends Controller
 
 
 
+
+
+    public function reviewBeneficiario(Request $request, int $id)
+    {
+        $ben = \App\Models\Beneficiario::findOrFail($id);
+
+        $data = $request->validate([
+            'porcentaje_rsh' => ['nullable','integer','between:0,100'],
+            'observaciones'  => ['nullable','string'],
+            'accion'         => ['required','in:aceptar,rechazar,guardar'],
+        ]);
+
+        if ($data['accion'] === 'aceptar') {
+            $ben->aceptado = 1;
+        } elseif ($data['accion'] === 'rechazar') {
+            $ben->aceptado = 0;
+        }
+
+        $ben->porcentaje_rsh = $data['porcentaje_rsh'];
+        $ben->observaciones  = $data['observaciones'];
+        $ben->save();
+
+        return back()->with('status', 'Revisión actualizada.');
+    }
+
+
+
+
+
+    public function formBeneficiarios(\Illuminate\Http\Request $request, int $id)
+    {
+        $funcionario = auth('func')->user();
+
+        $form = \App\Models\Formulario::with(['periodo','organizacion'])
+            ->findOrFail($id);
+
+        $beneficiarios = \App\Models\Beneficiario::where('formulario_id', $form->id)
+            ->orderByDesc('id')
+            ->paginate(20)
+            ->appends($request->query());
+
+        $backParams = ['id' => $form->organizacion_id] + $request->only('periodo_id');
+
+        return view('municipales.form-beneficiarios', [
+            'funcionario'    => $funcionario,
+            'form'           => $form,
+            'beneficiarios'  => $beneficiarios,
+            'backParams'     => $backParams,
+        ]);
+    }
     
 }
 
