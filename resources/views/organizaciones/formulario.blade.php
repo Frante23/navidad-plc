@@ -234,6 +234,7 @@
                         <th class="px-4 py-2 border">Fecha Nac.</th>
                         <th class="px-4 py-2 border">Edad</th>
                         <th class="px-4 py-2 border">RUT</th>
+                        <th class="px-4 py-2 border">RUT Jefe de Hogar</th>
                         <th class="px-4 py-2 border">Direccion</th>
                         <th class="px-4 py-2 border">Acciones</th>
                     </tr>
@@ -270,6 +271,7 @@
                                 @endif
                             </td>
                             <td class="px-4 py-2 border">{{ $ben->rut_formateado ?? $ben->rut }}</td>
+                            <td class="px-4 py-2 border">{{ $ben->rut_jefe_hogar ?? '—' }}</td>
                             <td class="px-4 py-2 border">{{ $ben->direccion }}</td>
 
                     <td class="px-4 py-2 border text-center">

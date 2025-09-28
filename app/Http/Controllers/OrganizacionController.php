@@ -311,6 +311,7 @@ class OrganizacionController extends Controller
             'fecha_nacimiento' => 'required|date',
             'sexo'             => 'nullable|in:M,F,U',
             'direccion'        => 'required|string',
+            'rut_jefe_hogar' => 'nullable|string|max:15',
         ]);
 
         $form = \App\Models\Formulario::with('periodo')->findOrFail($beneficiario->formulario_id);
@@ -654,6 +655,7 @@ class OrganizacionController extends Controller
         $rut = strtoupper($rut);
         return preg_replace('/[^0-9K]/', '', $rut);
     }
+
 
 
 
