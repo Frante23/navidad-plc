@@ -28,5 +28,9 @@ class Formulario extends Model
     {
         return $this->hasMany(Beneficiario::class);
     }
+    public function organizacion()
+    {
+        return $this->belongsTo(Organizacion::class, 'organizacion_id');
+    }
 }
 

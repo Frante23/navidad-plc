@@ -16,6 +16,8 @@ use App\Exports\FormulariosExport;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
+
 
 class OrganizacionController extends Controller
 {
@@ -192,33 +194,75 @@ class OrganizacionController extends Controller
 
     public function storeBeneficiario(Request $request)
     {
-        $rutLimpio = $this->cleanRut($request->rut);
-        if (!$this->validateRut($rutLimpio)) {
-            return back()->withErrors(['rut' => "RUT inválido: $rutLimpio"])->withInput();
-        }
-
-        $request->validate([
-            'nombre_completo'  => 'required|string',
-            'fecha_nacimiento' => 'required|date',
-            'sexo'             => 'nullable|in:M,F,U',
-            'formulario_id'    => 'required|exists:formularios,id',
-            'direccion'        => 'required|string',
+        $data = $request->validate([
+            'formulario_id'     => 'required|exists:formularios,id',
+            'rut'               => 'required|string|max:15',
+            'nombre_completo'   => 'required|string|max:255',
+            'fecha_nacimiento'  => 'required|date',
+            'sexo'              => 'nullable|in:M,F,U',
+            'direccion'         => 'required|string|max:255',
         ]);
 
-        $form = \App\Models\Formulario::with('periodo')->findOrFail($request->formulario_id);
+        $orgId = session('organizacion_id');
+        $org   = \App\Models\Organizacion::findOrFail($orgId);
+
+        $form  = \App\Models\Formulario::with('periodo','organizacion')
+                    ->findOrFail($data['formulario_id']);
+
+        $periodoId = $form->periodo_id;
+
+        $rutLimpio = $this->limpiarRut($data['rut']);
+
+        $yaInscrito = DB::table('beneficiarios as b')
+            ->join('formularios as f','f.id','=','b.formulario_id')
+            ->join('organizaciones as o','o.id','=','b.organizacion_id')
+            ->where('b.rut', $rutLimpio)
+            ->where('f.periodo_id', $periodoId)
+            ->select(
+                'b.id as ben_id',
+                'b.created_at as ben_created',
+                'o.id as org_id',
+                'o.nombre as org_nombre',
+                'f.id as form_id'
+            )
+            ->orderBy('b.id')
+            ->first();
+
+        if ($yaInscrito) {
+            DB::table('intentos_duplicados')->insert([
+                'rut'               => $rutLimpio,
+                'periodo_id'        => $periodoId,
+                'organizacion_id'   => $orgId,                
+                'formulario_id'     => $form->id,           
+                'existe_en_org_id'  => $yaInscrito->org_id,   
+                'existe_en_form_id' => $yaInscrito->form_id,
+                'existe_fecha'      => $yaInscrito->ben_created,
+                'ip'                => $request->ip(),
+                'detalles_json'     => json_encode([
+                    'intentado_por'  => $org->nombre,
+                    'existe_en_org'  => $yaInscrito->org_nombre,
+                    'form_origen'    => $yaInscrito->form_id,
+                ]),
+            ]);
+
+            return back()->withErrors([
+                'rut' => "Este beneficiario fue inscrito previamente por {$yaInscrito->org_nombre} el día "
+                        . Carbon::parse($yaInscrito->ben_created)->format('d-m-Y H:i') . "."
+            ])->withInput();
+        }
+
         $anioPeriodo = $form->periodo?->anio ?? now()->year;
-        $corte = \Carbon\Carbon::create($anioPeriodo, 12, 31, 23, 59, 59);
+        $corte = Carbon::create($anioPeriodo, 12, 31, 23, 59, 59);
 
-        $edadMeses = $this->edadEnMesesEnterosAlCorte($request->fecha_nacimiento, $corte);
+        $edadMeses = $this->edadEnMesesEnterosAlCorte($data['fecha_nacimiento'], $corte);
+        $isBaby    = ($edadMeses < 12);
 
-        $isBaby = $edadMeses < 12;
-
-        if (!$isBaby && $request->sexo === 'U') {
+        if (!$isBaby && ($data['sexo'] ?? null) === 'U') {
             return back()->withErrors([
                 'sexo' => 'Para mayores de 11 meses al 31/12 del período, seleccione Masculino o Femenino.'
             ])->withInput();
         }
-        $sexo = $isBaby ? 'U' : ($request->sexo ?: null);
+        $sexo = $isBaby ? 'U' : ($data['sexo'] ?? null);
 
         $tramo = \App\Models\TramoEdad::where('edad_min_meses', '<=', $edadMeses)
             ->where('edad_max_meses', '>=', $edadMeses)
@@ -232,18 +276,18 @@ class OrganizacionController extends Controller
 
         \App\Models\Beneficiario::create([
             'rut'              => $rutLimpio,
-            'nombre_completo'  => $request->nombre_completo,
-            'fecha_nacimiento' => $request->fecha_nacimiento,
+            'nombre_completo'  => $data['nombre_completo'],
+            'fecha_nacimiento' => $data['fecha_nacimiento'],
             'sexo'             => $sexo,
-            'direccion'        => $request->direccion,
-            'formulario_id'    => $request->formulario_id,
-            'organizacion_id'  => session('organizacion_id'),
+            'direccion'        => $data['direccion'],
+            'formulario_id'    => $data['formulario_id'],
+            'organizacion_id'  => $orgId,
             'tramo_id'         => $tramo->id,
         ]);
 
-        return redirect()->route('formulario.show')
-            ->with('success_ben', 'Beneficiario registrado correctamente.');
+        return back()->with('success_ben','Beneficiario registrado.');
     }
+
 
 
     public function update(Request $request, $id)
@@ -601,6 +645,11 @@ class OrganizacionController extends Controller
         ]);
     }
 
+    private function limpiarRut(string $rut): string
+    {
+        $rut = strtoupper($rut);
+        return preg_replace('/[^0-9K]/', '', $rut);
+    }
 
 
 

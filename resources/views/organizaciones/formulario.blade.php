@@ -16,86 +16,75 @@
 
     <script src="https://cdn.jsdelivr.net/npm/rut.js/dist/rut.min.js"></script>
     <script>
-    document.addEventListener("DOMContentLoaded", () => {
-    const rutInput = document.querySelector("input[name='rut']");
-    if (rutInput && typeof RUT !== "undefined") {
-        rutInput.addEventListener("blur", () => {
+    document.addEventListener('DOMContentLoaded', () => {
+    const rutInput = document.querySelector('input[name="rut"]');
+    if (rutInput && typeof RUT !== 'undefined') {
+        rutInput.addEventListener('blur', () => {
         if (RUT.isValid(rutInput.value)) {
             rutInput.value = RUT.format(rutInput.value);
         } else {
-            alert("RUT invalido, por favor verifica.");
+            alert('RUT inválido, por favor verifica.');
             rutInput.focus();
         }
         });
     }
 
-    const fechaInput = document.querySelector("input[name='fecha_nacimiento']");
-    const sexoSelect = document.querySelector("select[name='sexo']");
-    const noteId = "sexo-unisex-note";
+    const fechaInput = document.querySelector('input[name="fecha_nacimiento"]');
+    const sexoSelect = document.querySelector('select[name="sexo"]');
+    if (!fechaInput || !sexoSelect) return;
 
-    let optU = null;
-    if (sexoSelect) {
-        optU = [...sexoSelect.options].find(o => o.value === "U");
+    let note = document.getElementById('sexoNote');
+    if (!note) {
+        note = document.createElement('small');
+        note.id = 'sexoNote';
+        note.className = 'block mt-1 text-xs text-gray-500';
+        sexoSelect.parentElement.appendChild(note);
     }
 
-    function monthsBetween(d1, d2) {
+    let optU = Array.from(sexoSelect.options).find(o => o.value === 'U');
+    const ensureOptU = () => {
+        if (!optU) {
+        optU = document.createElement('option');
+        optU.value = 'U';
+        optU.textContent = 'Unisex (0 a 11 meses)';
+        sexoSelect.appendChild(optU);
+        }
+    };
+
+    const monthsBetween = (d1, d2) => {
         let m = (d2.getFullYear() - d1.getFullYear()) * 12 + (d2.getMonth() - d1.getMonth());
         if (d2.getDate() < d1.getDate()) m--;
         return m;
-    }
+    };
 
-    function ensureNote() {
-        let note = document.getElementById(noteId);
-        if (!note) {
-        note = document.createElement("small");
-        note.id = noteId;
-        note.className = "block mt-1 text-xs text-gray-500";
-        sexoSelect.parentElement.appendChild(note);
-        }
-        return note;
-    }
+    const enforceUnisexIfNeeded = () => {
+        if (!fechaInput.value) return;
 
-    function enforceUnisexIfNeeded() {
-        if (!fechaInput || !sexoSelect || !fechaInput.value) return;
-        const dob = new Date(fechaInput.value + "T00:00:00");
+        const dob = new Date(fechaInput.value + 'T00:00:00');
         const today = new Date();
         const months = monthsBetween(dob, today);
-        const note = ensureNote();
 
         if (months >= 0 && months <= 11) {
-        if (optU) {
-            optU.disabled = false;
-            optU.hidden = false;
+        ensureOptU();
+        optU.disabled = false;
+        optU.hidden = false;
+        sexoSelect.value = 'U';
+        sexoSelect.setAttribute('disabled', 'disabled');
+        note.textContent = 'Sexo fijado automáticamente a Unisex para 0–11 meses.';
         } else {
-            const o = document.createElement("option");
-            o.value = "U";
-            o.textContent = "Unisex (0 a 11 meses)";
-            sexoSelect.appendChild(o);
-            optU = o;
+        sexoSelect.removeAttribute('disabled');
+        if (sexoSelect.value === 'U') sexoSelect.value = '';
+        if (optU) { optU.disabled = true; optU.hidden = true; }
+        note.textContent = '';
         }
-        sexoSelect.value = "U";
-        sexoSelect.setAttribute("disabled", "disabled");
-        note.textContent = "Sexo fijado automáticamente a Unisex para 0–11 meses.";
-        } else {
-        if (sexoSelect.hasAttribute("disabled")) {
-            sexoSelect.removeAttribute("disabled");
-        }
-        if (optU) {
-            if (sexoSelect.value === "U") sexoSelect.value = "";
-            optU.disabled = true;
-            optU.hidden = true;
-        }
-        note.textContent = "";
-        }
-    }
+    };
 
-    if (fechaInput) {
-        fechaInput.addEventListener("change", enforceUnisexIfNeeded);
-        fechaInput.addEventListener("blur", enforceUnisexIfNeeded);
-        enforceUnisexIfNeeded();
-    }
+    fechaInput.addEventListener('change', enforceUnisexIfNeeded);
+    fechaInput.addEventListener('blur', enforceUnisexIfNeeded);
+    enforceUnisexIfNeeded(); 
     });
     </script>
+
 
 
 

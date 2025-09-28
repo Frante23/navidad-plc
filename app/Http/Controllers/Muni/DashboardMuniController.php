@@ -554,32 +554,43 @@ class DashboardMuniController extends Controller
     public function duplicados(Request $request)
     {
         $funcionario = auth('func')->user();
-        $periodoSel = $request->integer('periodo_id');
+        $periodoSel  = $request->integer('periodo_id');
 
         $periodos = \App\Models\Periodo::orderByDesc('anio')->get();
 
-        $base = \DB::table('beneficiarios as b')
-            ->join('formularios as f','f.id','=','b.formulario_id')
-            ->join('organizaciones as o','o.id','=','b.organizacion_id')
-            ->leftJoin('periodos as p','p.id','=','f.periodo_id')
-            ->when($periodoSel, fn($qq)=>$qq->where('f.periodo_id',$periodoSel));
-
-        $duplicadosRut = $base
-            ->select('b.rut')
-            ->groupBy('b.rut')
-            ->havingRaw('COUNT(*) > 1')
-            ->pluck('rut');
-
-        $rows = $base
-            ->selectRaw('b.rut, b.id as beneficiario_id, b.nombre_completo, b.fecha_nacimiento, o.nombre as organizacion, o.personalidad_juridica as pj, f.id as formulario_id, p.anio as periodo')
-            ->whereIn('b.rut', $duplicadosRut)
-            ->orderBy('b.rut')
-            ->orderBy('b.id')
+        $agrupado = DB::table('intentos_duplicados as i')
+            ->when($periodoSel, fn($q)=>$q->where('i.periodo_id', $periodoSel))
+            ->selectRaw('i.rut, COUNT(*) as intentos, MAX(i.created_at) as ultimo_intento')
+            ->groupBy('i.rut')
+            ->orderByDesc('ultimo_intento')
             ->paginate(30)
             ->withQueryString();
 
-        return view('municipales.duplicados', compact('funcionario','rows','periodos','periodoSel'));
+        $rutDetalle = null;
+        if ($request->filled('rut')) {
+            $rut = $request->get('rut');
+            $rutDetalle = DB::table('intentos_duplicados as i')
+                ->leftJoin('organizaciones as o1','o1.id','=','i.organizacion_id')
+                ->leftJoin('organizaciones as o2','o2.id','=','i.existe_en_org_id')
+                ->leftJoin('formularios as f1','f1.id','=','i.formulario_id')
+                ->leftJoin('formularios as f2','f2.id','=','i.existe_en_form_id')
+                ->leftJoin('periodos as p','p.id','=','i.periodo_id')
+                ->where('i.rut', $rut)
+                ->when($periodoSel, fn($q)=>$q->where('i.periodo_id', $periodoSel))
+                ->selectRaw("
+                    i.id, i.created_at as intento_fecha, i.ip,
+                    i.rut, p.anio as periodo,
+                    o1.nombre as intento_org, i.formulario_id,
+                    o2.nombre as existe_org, i.existe_en_form_id, i.existe_fecha
+                ")
+                ->orderByDesc('i.created_at')
+                ->paginate(30, ['*'], 'detalle_page')
+                ->withQueryString();
+        }
+
+        return view('municipales.duplicados', compact('funcionario','periodos','periodoSel','agrupado','rutDetalle'));
     }
+
 
 
 
