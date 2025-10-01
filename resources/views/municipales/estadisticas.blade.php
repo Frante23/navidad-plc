@@ -153,7 +153,7 @@
     </div> {{-- /flex --}}
   </div> {{-- /container --}}
 
-  {{-- Chart.js (sin estilos extra) --}}
+  {{-- Chart.js --}}
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     // A) Barra simple: estados

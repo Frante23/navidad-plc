@@ -962,6 +962,41 @@ class DashboardMuniController extends Controller
 
 
 
+
+
+
+    public function bulkSaveBeneficiarios(Request $request, int $id)
+    {
+        $form = \App\Models\Formulario::findOrFail($id);
+
+        $items = $request->input('items', []);
+
+        foreach ($items as $benId => $data) {
+            $ben = \App\Models\Beneficiario::where('formulario_id', $form->id)->find($benId);
+            if (!$ben) {
+                continue;
+            }
+
+            $rsh = $data['porcentaje_rsh'] ?? null;
+            $obs = $data['observaciones']  ?? null;
+
+            if ($rsh === '' || $rsh === null) {
+                $ben->porcentaje_rsh = null;
+            } else {
+                $rsh = (int) $rsh;
+                if ($rsh < 0)   $rsh = 0;
+                if ($rsh > 100) $rsh = 100;
+                $ben->porcentaje_rsh = $rsh;
+            }
+
+            $ben->observaciones = is_string($obs) ? trim($obs) : null;
+
+            $ben->save();
+        }
+
+        return back()->with('status', 'Cambios guardados correctamente.');
+    }
+
 }
 
 
