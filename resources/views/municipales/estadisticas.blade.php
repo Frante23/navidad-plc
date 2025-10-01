@@ -92,13 +92,14 @@
           <canvas id="chartMeses" height="90"></canvas>
         </div>
 
-        {{-- E) Dispersión: edad (meses) vs %RSH (si hay datos) --}}
+        {{-- E) Dispersión: %RSH vs edad (años) (si hay datos) --}}
         @if(count($scatter)>0)
         <div class="bg-white rounded-xl shadow p-4">
-          <div class="mb-2 font-semibold">%RSH vs edad (meses)</div>
-          <canvas id="chartScatter" height="110"></canvas>
+            <div class="mb-2 font-semibold"> edad (años) vs %RSH </div>
+            <canvas id="chartScatter" height="110"></canvas>
         </div>
         @endif
+
 
         {{-- Top 10 organizaciones por beneficiarios --}}
         <div class="bg-white rounded-xl shadow overflow-hidden">
@@ -173,7 +174,7 @@
     });
 
     // B) Dona: sexo global
-    const sexo = @json($sexoGlobal); // { M: 10, F: 12, U: 2 }
+    const sexo = @json($sexoGlobal);
     const donutLabels = Object.keys(sexo);
     const donutData   = Object.values(sexo);
     new Chart(document.getElementById('chartSexo'), {
@@ -224,25 +225,62 @@
       }
     });
 
-    // E) Dispersión: edad (meses) vs %RSH
+    // E) Dispersión: edad (años) vs %RSH
     @if(count($scatter)>0)
+    {
+    const scatterRaw = @json($scatter);
+
+    const scatterYears = scatterRaw.map(p => ({
+        x: p.x / 12,
+        y: p.y
+    }));
+
     new Chart(document.getElementById('chartScatter'), {
-      type: 'scatter',
-      data: {
+        type: 'scatter',
+        data: {
         datasets: [{
-          label: '%RSH vs edad (meses)',
-          data: @json($scatter),
-          pointRadius: 3
+            label: '%RSH vs edad (años)',
+            data: scatterYears,
+            pointRadius: 3
         }]
-      },
-      options: {
+        },
+        options: {
         responsive: true,
         scales: {
-          x: { type: 'linear', title: { display: true, text: 'Edad (meses)' } },
-          y: { beginAtZero: true, title: { display: true, text: '%RSH' } }
+            x: {
+            type: 'linear',
+            title: { display: true, text: 'Edad (años)' },
+            ticks: {
+                callback: (value) => Number(value).toFixed(1)
+            }
+            },
+            y: {
+            beginAtZero: true,
+            title: { display: true, text: '%RSH' },
+            ticks: {
+                callback: (value) => `${value}%`
+            }
+            }
+        },
+        plugins: {
+            tooltip: {
+            callbacks: {
+                label: (ctx) => {
+                const x = ctx.parsed.x?.toFixed(1);
+                const y = ctx.parsed.y;
+                return `Edad: ${x} años, RSH: ${y}%`;
+                }
+            }
+            },
+            legend: { display: false }
         }
-      }
+        }
     });
+    }
     @endif
+
   </script>
 @endsection
+
+
+
