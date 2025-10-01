@@ -38,25 +38,29 @@
                     <td class="px-4 py-2 text-sm">{{ $org->email }}</td>
                     <td class="px-4 py-2 text-sm">{{ $org->created_at?->format('d-m-Y H:i') }}</td>
                     <td class="px-4 py-2">
-                      <div class="flex items-center justify-end gap-2">
-                        <form method="POST" action="{{ route('muni.org.aprobar', $org->id) }}" class="flex items-center gap-2">
-                          @csrf
-                          <input type="password" name="clave" placeholder="Contraseña"
-                                 class="border rounded px-2 py-1 text-sm" required>
-                          <button class="bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1.5 rounded">
-                            Activar
-                          </button>
-                        </form>
+                      <form method="POST" action="{{ route('muni.org.aprobar', $org->id) }}" class="flex items-center gap-2">
+                        @csrf
 
-                        <form method="POST" action="{{ route('muni.org.rechazar', $org->id) }}">
-                          @csrf
-                          <button class="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1.5 rounded">
-                            Marcar inactiva
-                          </button>
-                        </form>
-                      </div>
+                        <input type="password" name="clave" class="border rounded px-3 py-2 w-56" placeholder="Contraseña" required>
+                        <input type="password" name="clave_confirmation" class="border rounded px-3 py-2 w-56" placeholder="Confirmar contraseña" required>
+
+                        <button type="submit"
+                                class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                          Activar
+                        </button>
+                      </form>
+                    </td>
+
+                    <td class="px-4 py-2">
+                      <form method="POST" action="{{ route('muni.org.rechazar', $org->id) }}">
+                        @csrf
+                        <button class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
+                          Marcar inactiva
+                        </button>
+                      </form>
                     </td>
                   </tr>
+
                 @empty
                   <tr>
                     <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500">

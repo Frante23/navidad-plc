@@ -1,5 +1,6 @@
 <aside class="hidden md:block w-64 shrink-0">
   <nav class="bg-white rounded-xl shadow p-4 space-y-1 sticky top-6">
+
     <a href="{{ route('muni.dashboard') }}"
        class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-50
               {{ request()->routeIs('muni.dashboard') ? 'bg-gray-100 font-semibold' : '' }}">
@@ -23,7 +24,7 @@
     </a>
 
     <a href="{{ route('muni.org.pendientes') }}"
-      class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-50
+       class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-50
               {{ request()->routeIs('muni.org.pendientes') ? 'bg-gray-100 font-semibold' : '' }}">
       <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
@@ -31,11 +32,6 @@
       </svg>
       <span>Habilitación de organizaciones</span>
     </a>
-
-
-
-
-
 
     <a href="{{ route('muni.duplicados') }}"
        class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-50
@@ -46,5 +42,28 @@
       </svg>
       <span>RUTs duplicados</span>
     </a>
+
+    <div class="pt-3 pb-1 text-xs uppercase tracking-wide text-gray-400">Reportes</div>
+
+    <a href="{{ route('muni.orgs.export.pdf', request()->only('periodo_id')) }}"
+       class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-50
+              {{ request()->routeIs('muni.orgs.export.pdf') ? 'bg-gray-100 font-semibold' : '' }}">
+      <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+              d="M12 20h9M12 4h9M3 8h18M3 16h18" />
+      </svg>
+      <span>Exportar listado de organizaciones (PDF)</span>
+    </a>
+
+    <a href="{{ route('muni.estadisticas', request()->only('periodo_id')) }}"
+       class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-50
+              {{ request()->routeIs('muni.estadisticas') ? 'bg-gray-100 font-semibold' : '' }}">
+      <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+              d="M3 3v18h18M7 13v5m4-9v9m4-13v13" />
+      </svg>
+      <span>Estadísticas</span>
+    </a>
+
   </nav>
 </aside>

@@ -576,7 +576,7 @@ class DashboardMuniController extends Controller
     public function orgAprobar(Request $request, $id)
     {
         $request->validate([
-            'clave' => ['required','string','min:6','confirmed'],
+            'clave' => ['required','string','min:6','confirmed'], 
         ]);
 
         $org = Organizacion::findOrFail($id);
@@ -585,11 +585,12 @@ class DashboardMuniController extends Controller
         }
 
         $org->estado = 'activo';
-        $org->clave  = Hash::make($request->clave);
+        $org->clave  = \Illuminate\Support\Facades\Hash::make($request->clave);
         $org->save();
 
         return back()->with('status','Organización aprobada y activada.');
     }
+
 
 
     public function orgRechazar($id)
@@ -761,7 +762,135 @@ class DashboardMuniController extends Controller
             'backParams'     => $backParams,
         ]);
     }
+
+
+
+
+
+    private function buildOrgListado(?int $periodoId, ?string $q)
+    {
+        $subForm = DB::table('formularios as f')
+            ->selectRaw('f.organizacion_id, COUNT(*) as form_count')
+            ->when($periodoId, fn($qq) => $qq->where('f.periodo_id', $periodoId))
+            ->groupBy('f.organizacion_id');
+
+        $subBen = DB::table('beneficiarios as b')
+            ->join('formularios as f', 'f.id', '=', 'b.formulario_id')
+            ->selectRaw('b.organizacion_id, COUNT(*) as ben_count')
+            ->when($periodoId, fn($qq) => $qq->where('f.periodo_id', $periodoId))
+            ->groupBy('b.organizacion_id');
+
+        return DB::table('organizaciones as o')
+            ->leftJoinSub($subForm, 'formc', 'formc.organizacion_id', '=', 'o.id')
+            ->leftJoinSub($subBen,  'benc',  'benc.organizacion_id',  '=', 'o.id')
+            ->when($q, function ($qq) use ($q) {
+                $qq->where(function ($w) use ($q) {
+                    $w->where('o.nombre', 'like', "%{$q}%")
+                    ->orWhere('o.personalidad_juridica', 'like', "%{$q}%");
+                });
+            })
+            ->selectRaw("
+                o.id,
+                o.nombre,
+                o.personalidad_juridica as pj,
+                o.estado,
+                o.created_at,
+                COALESCE(formc.form_count, 0) as formularios,
+                COALESCE(benc.ben_count, 0)  as beneficiarios
+            ")
+            ->orderBy('o.nombre', 'asc');
+    }
+
+
+
+
+
+    public function exportListadoOrganizacionesPdf(Request $request)
+    {
+        $periodoId = $request->integer('periodo_id');
+        $q         = trim($request->get('q',''));
+
+        $rows = $this->buildOrgListado($periodoId, $q)->get();
+
+        $titulo = 'Listado de Organizaciones'.($periodoId ? " (Período {$periodoId})" : '');
+
+        $html = view('municipales.exports.orgs-pdf', compact('rows','titulo'))->render();
+
+        $options = new Options();
+        $options->set('isRemoteEnabled', true);
+        $options->set('defaultFont', 'DejaVu Sans');
+
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4', 'landscape'); 
+        $dompdf->render();
+
+        $filename = 'organizaciones_'.now()->format('Ymd_His').'.pdf';
+        return response($dompdf->output(), 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => "attachment; filename=\"$filename\"",
+        ]);
+    }
+
+
     
+
+    public function estadisticas(Request $request)
+    {
+        $funcionario = auth('func')->user();
+        $periodoId   = $request->integer('periodo_id');
+
+        $orgTotales = DB::table('organizaciones')
+            ->selectRaw("estado, COUNT(*) as c")
+            ->groupBy('estado')
+            ->pluck('c','estado');
+
+        $totalOrgs    = DB::table('organizaciones')->count();
+        $activos      = $orgTotales['activo']    ?? 0;
+        $pendientes   = $orgTotales['pendiente'] ?? 0;
+        $inactivos    = $orgTotales['inactivo']  ?? 0;
+
+        $formPorEstado = DB::table('formularios as f')
+            ->when($periodoId, fn($q)=>$q->where('f.periodo_id', $periodoId))
+            ->selectRaw('f.estado, COUNT(*) as c')
+            ->groupBy('f.estado')
+            ->pluck('c','estado');
+
+        $formsAbiertos = $formPorEstado['abierto'] ?? 0;
+        $formsCerrados = $formPorEstado['cerrado'] ?? 0;
+
+        $topOrgs = DB::table('beneficiarios as b')
+            ->join('organizaciones as o', 'o.id','=','b.organizacion_id')
+            ->join('formularios as f', 'f.id','=','b.formulario_id')
+            ->when($periodoId, fn($q)=>$q->where('f.periodo_id', $periodoId))
+            ->selectRaw('o.id, o.nombre, COUNT(*) as total_beneficiarios')
+            ->groupBy('o.id','o.nombre')
+            ->orderByDesc('total_beneficiarios')
+            ->limit(10)
+            ->get();
+
+        $porTipo = DB::table('organizaciones as o')
+            ->leftJoin('tipos_organizaciones as t', 't.id','=','o.tipo_organizacion_id')
+            ->selectRaw('COALESCE(t.nombre,"Sin tipo") as tipo, COUNT(*) as c')
+            ->groupBy('tipo')
+            ->orderByDesc('c')
+            ->get();
+
+        $chartLabels = ['Activas', 'Pendientes', 'Inactivas'];
+        $chartData   = [ $activos, $pendientes, $inactivos ];
+
+        return view('municipales.estadisticas', compact(
+            'funcionario','periodoId',
+            'totalOrgs','activos','pendientes','inactivos',
+            'formsAbiertos','formsCerrados',
+            'topOrgs','porTipo',
+            'chartLabels', 'chartData'
+        ));
+    }
+
+
+
+
 }
 
 

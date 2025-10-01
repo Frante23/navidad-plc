@@ -71,4 +71,11 @@ Route::middleware('auth:func')->group(function () {
 
 
 
+
+    Route::get('/muni/organizaciones/export/pdf', [DashboardMuniController::class, 'exportListadoOrganizacionespdf'])
+    ->name('muni.orgs.export.pdf');
+    Route::get('/muni/estadisticas', [DashboardMuniController::class, 'estadisticas'])
+        ->name('muni.estadisticas');
+
+
 });
