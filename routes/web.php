@@ -77,5 +77,10 @@ Route::middleware('auth:func')->group(function () {
     Route::get('/muni/estadisticas', [DashboardMuniController::class, 'estadisticas'])
         ->name('muni.estadisticas');
 
+    Route::get('/muni/estadisticas/org/{id}', function($id, \Illuminate\Http\Request $r) {
+        return redirect()->route('muni.estadisticas', ['org_id'=>$id] + $r->only('periodo_id'));
+    })->name('muni.estadisticas.org');
+
+
 
 });

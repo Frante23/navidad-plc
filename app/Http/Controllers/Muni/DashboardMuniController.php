@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Support\Facades\Hash;  
+use Carbon\Carbon;
 
 
 class DashboardMuniController extends Controller
@@ -838,53 +839,123 @@ class DashboardMuniController extends Controller
     public function estadisticas(Request $request)
     {
         $funcionario = auth('func')->user();
-        $periodoId   = $request->integer('periodo_id');
 
-        $orgTotales = DB::table('organizaciones')
-            ->selectRaw("estado, COUNT(*) as c")
-            ->groupBy('estado')
-            ->pluck('c','estado');
+        $periodoId  = $request->integer('periodo_id');
+        $orgId      = $request->integer('org_id'); 
 
-        $totalOrgs    = DB::table('organizaciones')->count();
-        $activos      = $orgTotales['activo']    ?? 0;
-        $pendientes   = $orgTotales['pendiente'] ?? 0;
-        $inactivos    = $orgTotales['inactivo']  ?? 0;
+        $totalOrgs = \App\Models\Organizacion::count();
+        $activos   = \App\Models\Organizacion::where('estado','activo')->count();
+        $pendientes= \App\Models\Organizacion::where('estado','pendiente')->count();
+        $inactivos = \App\Models\Organizacion::where('estado','inactivo')->count();
 
-        $formPorEstado = DB::table('formularios as f')
-            ->when($periodoId, fn($q)=>$q->where('f.periodo_id', $periodoId))
-            ->selectRaw('f.estado, COUNT(*) as c')
-            ->groupBy('f.estado')
-            ->pluck('c','estado');
-
-        $formsAbiertos = $formPorEstado['abierto'] ?? 0;
-        $formsCerrados = $formPorEstado['cerrado'] ?? 0;
+        $formsAbiertos = \App\Models\Formulario::when($periodoId, fn($q)=>$q->where('periodo_id',$periodoId))
+            ->where('estado','abierto')->count();
+        $formsCerrados = \App\Models\Formulario::when($periodoId, fn($q)=>$q->where('periodo_id',$periodoId))
+            ->where('estado','cerrado')->count();
 
         $topOrgs = DB::table('beneficiarios as b')
-            ->join('organizaciones as o', 'o.id','=','b.organizacion_id')
-            ->join('formularios as f', 'f.id','=','b.formulario_id')
-            ->when($periodoId, fn($q)=>$q->where('f.periodo_id', $periodoId))
-            ->selectRaw('o.id, o.nombre, COUNT(*) as total_beneficiarios')
+            ->join('formularios as f','f.id','=','b.formulario_id')
+            ->join('organizaciones as o','o.id','=','b.organizacion_id')
+            ->when($periodoId, fn($q)=>$q->where('f.periodo_id',$periodoId))
+            ->select('o.id','o.nombre', DB::raw('COUNT(*) as total_beneficiarios'))
             ->groupBy('o.id','o.nombre')
             ->orderByDesc('total_beneficiarios')
             ->limit(10)
             ->get();
 
         $porTipo = DB::table('organizaciones as o')
-            ->leftJoin('tipos_organizaciones as t', 't.id','=','o.tipo_organizacion_id')
-            ->selectRaw('COALESCE(t.nombre,"Sin tipo") as tipo, COUNT(*) as c')
+            ->leftJoin('tipos_organizaciones as t','t.id','=','o.tipo_organizacion_id')
+            ->select(DB::raw('COALESCE(t.nombre,"Sin tipo") as tipo'), DB::raw('COUNT(*) as c'))
             ->groupBy('tipo')
-            ->orderByDesc('c')
+            ->orderBy('tipo')
             ->get();
 
-        $chartLabels = ['Activas', 'Pendientes', 'Inactivas'];
-        $chartData   = [ $activos, $pendientes, $inactivos ];
+        $chartEstadosRaw = DB::table('organizaciones')
+            ->select('estado', DB::raw('COUNT(*) as c'))
+            ->groupBy('estado')->get();
+        $chartLabels = $chartEstadosRaw->pluck('estado');
+        $chartData   = $chartEstadosRaw->pluck('c');
+
+        $sexoGlobal = DB::table('beneficiarios as b')
+            ->join('formularios as f','f.id','=','b.formulario_id')
+            ->when($periodoId, fn($q)=>$q->where('f.periodo_id',$periodoId))
+            ->when($orgId, fn($q)=>$q->where('b.organizacion_id',$orgId))
+            ->select('b.sexo', DB::raw('COUNT(*) as c'))
+            ->groupBy('b.sexo')->pluck('c','sexo')->all();
+
+        $tramos = DB::table('tramos_edad')->orderBy('edad_min_meses')->get(['id','nombre_tramo']);
+        $stackTramoLabels = $tramos->pluck('nombre_tramo');
+        $stackM = array_fill(0, $tramos->count(), 0);
+        $stackF = array_fill(0, $tramos->count(), 0);
+        $stackU = array_fill(0, $tramos->count(), 0);
+
+        $porTramoSexo = DB::table('beneficiarios as b')
+            ->join('formularios as f','f.id','=','b.formulario_id')
+            ->when($periodoId, fn($q)=>$q->where('f.periodo_id',$periodoId))
+            ->when($orgId, fn($q)=>$q->where('b.organizacion_id',$orgId))
+            ->select('b.tramo_id','b.sexo', DB::raw('COUNT(*) as c'))
+            ->groupBy('b.tramo_id','b.sexo')->get();
+
+        $indexByTramo = $tramos->pluck(null,'id'); 
+        $posByTramoId = [];
+        foreach ($tramos as $i => $t) $posByTramoId[$t->id] = $i;
+
+        foreach ($porTramoSexo as $r) {
+            if (!isset($posByTramoId[$r->tramo_id])) continue;
+            $pos = $posByTramoId[$r->tramo_id];
+            if ($r->sexo === 'M') $stackM[$pos] = (int)$r->c;
+            elseif ($r->sexo === 'F') $stackF[$pos] = (int)$r->c;
+            else $stackU[$pos] = (int)$r->c;
+        }
+
+        $anyo = optional(\App\Models\Periodo::find($periodoId))->anio ?? Carbon::now()->year;
+        $porMes = DB::table('beneficiarios as b')
+            ->join('formularios as f','f.id','=','b.formulario_id')
+            ->when($periodoId, fn($q)=>$q->where('f.periodo_id',$periodoId))
+            ->when(!$periodoId, fn($q)=>$q->whereYear('b.created_at',$anyo))
+            ->when($orgId, fn($q)=>$q->where('b.organizacion_id',$orgId))
+            ->select(DB::raw('MONTH(b.created_at) as m'), DB::raw('COUNT(*) as c'))
+            ->groupBy(DB::raw('MONTH(b.created_at)'))
+            ->pluck('c','m')->all();
+
+        $mesLabels = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        $mesData   = [];
+        for ($i=1;$i<=12;$i++){
+            $mesData[] = (int)($porMes[$i] ?? 0);
+        }
+
+        $scatter = DB::table('beneficiarios as b')
+            ->join('formularios as f','f.id','=','b.formulario_id')
+            ->when($periodoId, fn($q)=>$q->where('f.periodo_id',$periodoId))
+            ->when($orgId, fn($q)=>$q->where('b.organizacion_id',$orgId))
+            ->whereNotNull('b.porcentaje_rsh')
+            ->select('b.fecha_nacimiento','b.porcentaje_rsh')
+            ->limit(1000) 
+            ->get()
+            ->map(function($r) use ($anyo){
+                $fn = Carbon::parse($r->fecha_nacimiento)->startOfDay();
+                $corte = Carbon::create($anyo,12,31,23,59,59);
+                if ($fn->greaterThan($corte)) { $meses=0; }
+                else {
+                    $dif = $fn->diff($corte);
+                    $meses = $dif->y*12 + $dif->m;
+                }
+                return ['x'=>$meses, 'y'=>(int)$r->porcentaje_rsh];
+            });
+
+        $orgsSelect = \App\Models\Organizacion::orderBy('nombre')->get(['id','nombre']);
 
         return view('municipales.estadisticas', compact(
-            'funcionario','periodoId',
+            'funcionario',
+            'periodoId','orgId',
             'totalOrgs','activos','pendientes','inactivos',
             'formsAbiertos','formsCerrados',
             'topOrgs','porTipo',
-            'chartLabels', 'chartData'
+            'chartLabels','chartData',
+            'sexoGlobal','stackTramoLabels','stackM','stackF','stackU',
+            'mesLabels','mesData',
+            'scatter',
+            'orgsSelect'
         ));
     }
 
