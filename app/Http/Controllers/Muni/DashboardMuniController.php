@@ -15,6 +15,9 @@ use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Support\Facades\Hash;  
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\NuevaClaveOrgMail;
+
 
 
 class DashboardMuniController extends Controller
@@ -577,7 +580,7 @@ class DashboardMuniController extends Controller
     public function orgAprobar(Request $request, $id)
     {
         $request->validate([
-            'clave' => ['required','string','min:6','confirmed'], 
+            'clave' => ['required','string','min:6','confirmed'],
         ]);
 
         $org = Organizacion::findOrFail($id);
@@ -586,11 +589,15 @@ class DashboardMuniController extends Controller
         }
 
         $org->estado = 'activo';
-        $org->clave  = \Illuminate\Support\Facades\Hash::make($request->clave);
+        $org->clave  = Hash::make($request->clave);
         $org->save();
 
-        return back()->with('status','Organización aprobada y activada.');
+        Mail::to($org->email)->send(new NuevaClaveOrgMail($org, $request->clave));
+
+        return back()->with('status','Organización aprobada, activada y correo enviado.');
     }
+
+
 
 
 
@@ -627,12 +634,16 @@ class DashboardMuniController extends Controller
 
         $org = Organizacion::findOrFail($id);
 
+        $plain = $data['clave'];
         $org->estado = 'activo';
-        $org->clave  = Hash::make($data['clave']); 
+        $org->clave  = \Illuminate\Support\Facades\Hash::make($plain);
         $org->save();
 
-        return back()->with('status', 'Organización reactivada con nueva contraseña.');
+        Mail::to($org->email)->send(new NuevaClaveOrgMail($org, $request->clave));
+
+        return back()->with('status', 'Organización reactivada; correo enviado con la nueva contraseña.');
     }
+
 
 
     public function orgActivarInactiva(Request $request, $id)
@@ -646,12 +657,16 @@ class DashboardMuniController extends Controller
             return back()->with('status','La organización no está inactiva.');
         }
 
+        $plain = $request->clave;
         $org->estado = 'activo';
-        $org->clave  = Hash::make($request->clave);
+        $org->clave  = \Illuminate\Support\Facades\Hash::make($plain);
         $org->save();
 
-        return back()->with('status','Organización reactivada correctamente.');
-}
+        Mail::to($org->email)->send(new NuevaClaveOrgMail($org, $request->clave));
+
+        return back()->with('status','Organización reactivada; correo enviado con la nueva contraseña.');
+    }
+
 
 
     public function duplicados(Request $request)
@@ -997,6 +1012,11 @@ class DashboardMuniController extends Controller
         return back()->with('status', 'Cambios guardados correctamente.');
     }
 
+
+
+
+
+    
 }
 
 
