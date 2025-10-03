@@ -64,33 +64,36 @@
 
           <tbody class="bg-white divide-y divide-gray-200">
           @foreach($beneficiarios as $b)
+            @php $rid = $b->id; @endphp
             <tr>
               <td class="px-3 py-2 text-sm">{{ $b->id }}</td>
               <td class="px-3 py-2 text-sm">{{ $b->nombre_completo }}</td>
               <td class="px-3 py-2 text-sm">{{ $b->rut }}</td>
 
-              {{-- Inputs asociados al form global via form="bulkForm" --}}
+              {{-- Inputs visibles (pertenecen al bulkForm) --}}
               <td class="px-3 py-2 text-sm">
-                <input type="number" min="0" max="100"
-                       name="items[{{ $b->id }}][porcentaje_rsh]"
-                       value="{{ old("items.$b->id.porcentaje_rsh", $b->porcentaje_rsh) }}"
-                       class="w-24 border rounded px-2 py-1 text-sm"
-                       form="bulkForm">
+                <input id="rsh-{{ $rid }}" type="number" min="0" max="100"
+                      name="items[{{ $rid }}][porcentaje_rsh]"
+                      value="{{ old("items.$rid.porcentaje_rsh", $b->porcentaje_rsh) }}"
+                      class="w-24 border rounded px-2 py-1 text-sm"
+                      form="bulkForm">
               </td>
-
               <td class="px-3 py-2 text-sm">
-                <input type="text"
-                       name="items[{{ $b->id }}][observaciones]"
-                       value="{{ old("items.$b->id.observaciones", $b->observaciones) }}"
-                       class="w-80 border rounded px-2 py-1 text-sm"
-                       form="bulkForm">
+                <input id="obs-{{ $rid }}" type="text"
+                      name="items[{{ $rid }}][observaciones]"
+                      value="{{ old("items.$rid.observaciones", $b->observaciones) }}"
+                      class="w-80 border rounded px-2 py-1 text-sm"
+                      form="bulkForm">
               </td>
 
               <td class="px-3 py-2 text-sm">
                 @php
-                  $tag = $b->aceptado === 1 ? ['bg-green-100','text-green-800','Aceptado']
-                       : ($b->aceptado === 0 ? ['bg-red-100','text-red-800','Rechazado']
-                       : ['bg-yellow-100','text-yellow-800','Pendiente']);
+                  $state = is_null($b->aceptado) ? null : (int)$b->aceptado; // null | 0 | 1
+                  $tag = $state === 1
+                        ? ['bg-green-100','text-green-800','Aceptado']
+                        : ($state === 0
+                          ? ['bg-red-100','text-red-800','Rechazado']
+                          : ['bg-yellow-100','text-yellow-800','Pendiente']);
                 @endphp
                 <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {{ $tag[0] }} {{ $tag[1] }}">
                   {{ $tag[2] }}
@@ -98,25 +101,32 @@
               </td>
 
               <td class="px-3 py-2 text-right text-sm space-x-1">
-                {{-- Aceptar / Rechazar por fila (se mantienen en formularios independientes) --}}
-                <form method="POST" action="{{ route('muni.ben.review', $b->id) }}" class="inline">
+
+                <form id="fr-{{ $rid }}" method="POST" action="{{ route('muni.ben.review', $b->id) }}" class="inline">
                   @csrf
-                  <input type="hidden" name="accion" value="aceptar">
-                  <button class="px-3 py-1 text-xs rounded ring-1 ring-green-300 text-green-700 hover:bg-green-50">
+                  <input type="hidden" name="accion" id="accion-{{ $rid }}">
+                  <input type="hidden" name="porcentaje_rsh" id="rsh-hidden-{{ $rid }}" value="{{ $b->porcentaje_rsh }}">
+                  <input type="hidden" name="observaciones"  id="obs-hidden-{{ $rid }}" value="{{ $b->observaciones }}">
+
+                  <button type="button"
+                          class="px-3 py-1 text-xs rounded ring-1 ring-green-300 text-green-700 hover:bg-green-50"
+                          onclick="submitRow({{ $rid }}, 'aceptar')">
                     Aceptar
                   </button>
-                </form>
-                <form method="POST" action="{{ route('muni.ben.review', $b->id) }}" class="inline">
-                  @csrf
-                  <input type="hidden" name="accion" value="rechazar">
-                  <button class="px-3 py-1 text-xs rounded ring-1 ring-red-300 text-red-700 hover:bg-red-50">
+
+                  <button type="button"
+                          class="px-3 py-1 text-xs rounded ring-1 ring-red-300 text-red-700 hover:bg-red-50"
+                          onclick="submitRow({{ $rid }}, 'rechazar')">
                     Rechazar
                   </button>
                 </form>
+
               </td>
+
             </tr>
           @endforeach
           </tbody>
+
         </table>
       </div>
 
@@ -131,4 +141,28 @@
       </div>
     @endif
   </div>
+
+
+
+<script>
+  function submitRow(id, accion) {
+    const rsh = document.getElementById('rsh-' + id)?.value ?? '';
+    const obs = document.getElementById('obs-' + id)?.value ?? '';
+
+    const hRsh = document.getElementById('rsh-hidden-' + id);
+    const hObs = document.getElementById('obs-hidden-' + id);
+    const hAcc = document.getElementById('accion-' + id);
+
+    if (hRsh) hRsh.value = rsh;
+    if (hObs) hObs.value = obs;
+    if (hAcc) hAcc.value = accion; 
+
+    const form = document.getElementById('fr-' + id);
+    if (form) form.submit();
+  }
+</script>
+
+
+
+
 @endsection

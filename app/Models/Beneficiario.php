@@ -27,6 +27,12 @@ class Beneficiario extends Model
         'aceptado',
     ];
 
+    protected $casts = [
+        'porcentaje_rsh' => 'integer',
+    ];
+
+
+
     public function setRutAttribute($value)
     {
         $this->attributes['rut'] = Rut::clean($value);

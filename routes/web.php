@@ -81,11 +81,9 @@ Route::middleware('auth:func')->group(function () {
         return redirect()->route('muni.estadisticas', ['org_id'=>$id] + $r->only('periodo_id'));
     })->name('muni.estadisticas.org');
 
-    Route::post(
-        '/muni/formulario/{id}/beneficiarios/save',
+    Route::post('/muni/formulario/{id}/beneficiarios/save',
         [\App\Http\Controllers\Muni\DashboardMuniController::class, 'bulkSaveBeneficiarios']
     )->name('muni.form.ben.bulkSave');
-
 
 
 });

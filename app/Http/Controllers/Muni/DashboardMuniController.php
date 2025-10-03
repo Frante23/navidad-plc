@@ -730,28 +730,43 @@ class DashboardMuniController extends Controller
 
 
 
-    public function reviewBeneficiario(Request $request, int $id)
+   public function reviewBeneficiario(Request $request, int $id)
     {
         $ben = \App\Models\Beneficiario::findOrFail($id);
 
-        $data = $request->validate([
-            'porcentaje_rsh' => ['nullable','integer','between:0,100'],
-            'observaciones'  => ['nullable','string'],
-            'accion'         => ['required','in:aceptar,rechazar,guardar'],
-        ]);
-
-        if ($data['accion'] === 'aceptar') {
-            $ben->aceptado = 1;
-        } elseif ($data['accion'] === 'rechazar') {
-            $ben->aceptado = 0;
+        $pr = $request->input('porcentaje_rsh');
+        if ($pr === '' || $pr === ' ') {
+            $request->merge(['porcentaje_rsh' => null]);
         }
 
-        $ben->porcentaje_rsh = $data['porcentaje_rsh'];
-        $ben->observaciones  = $data['observaciones'];
+        $request->validate([
+            'accion'         => ['required','in:aceptar,rechazar,guardar'],
+            'porcentaje_rsh' => ['nullable','integer','between:0,100'],
+            'observaciones'  => ['nullable','string'],
+        ]);
+
+        $accion = $request->string('accion')->toString();
+
+        if ($accion === 'aceptar') {
+            $ben->aceptado = 1;
+        } elseif ($accion === 'rechazar') {
+            $ben->aceptado = 0;
+        } 
+
+        if ($request->filled('porcentaje_rsh') || $request->has('porcentaje_rsh')) {
+            $ben->porcentaje_rsh = $request->input('porcentaje_rsh'); 
+        }
+        if ($request->has('observaciones')) {
+            $ben->observaciones = $request->input('observaciones');
+        }
+
         $ben->save();
 
         return back()->with('status', 'Revisión actualizada.');
     }
+
+
+
 
 
 
@@ -985,32 +1000,35 @@ class DashboardMuniController extends Controller
         $form = \App\Models\Formulario::findOrFail($id);
 
         $items = $request->input('items', []);
+        if (!is_array($items) || empty($items)) {
+            return back()->with('status', 'No hay cambios para guardar.');
+        }
 
-        foreach ($items as $benId => $data) {
+        foreach ($items as $benId => $payload) {
             $ben = \App\Models\Beneficiario::where('formulario_id', $form->id)->find($benId);
-            if (!$ben) {
-                continue;
-            }
+            if (!$ben) continue;
 
-            $rsh = $data['porcentaje_rsh'] ?? null;
-            $obs = $data['observaciones']  ?? null;
-
-            if ($rsh === '' || $rsh === null) {
-                $ben->porcentaje_rsh = null;
+            $porc = $payload['porcentaje_rsh'] ?? null;
+            if ($porc !== null && $porc !== '') {
+                $porc = (int) $porc;
+                if ($porc < 0)   $porc = 0;
+                if ($porc > 100) $porc = 100;
             } else {
-                $rsh = (int) $rsh;
-                if ($rsh < 0)   $rsh = 0;
-                if ($rsh > 100) $rsh = 100;
-                $ben->porcentaje_rsh = $rsh;
+                $porc = null; 
             }
 
-            $ben->observaciones = is_string($obs) ? trim($obs) : null;
+            $obs = $payload['observaciones'] ?? null;
 
+            $ben->porcentaje_rsh = $porc;
+            $ben->observaciones  = $obs;
             $ben->save();
         }
 
         return back()->with('status', 'Cambios guardados correctamente.');
     }
+
+
+
 
 
 
