@@ -17,6 +17,8 @@ use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
+use App\Rules\ClRut;
+
 
 
 class OrganizacionController extends Controller
@@ -195,15 +197,13 @@ class OrganizacionController extends Controller
     public function storeBeneficiario(Request $request)
     {
         $data = $request->validate([
-            'formulario_id'     => 'required|exists:formularios,id',
-            'rut'               => 'required|string|max:15',
-            'nombre_completo'   => 'required|string|max:255',
-            'fecha_nacimiento'  => 'required|date',
-            'sexo'              => 'nullable|in:M,F,U',
-            'direccion'         => 'required|string|max:255',
-            'rut_jefe_hogar'    => ['required','string','max:20'],
-            'porcentaje_rsh'    => ['nullable','integer','between:0,100'],
-            'observaciones'     => ['nullable','string'],
+            'formulario_id'    => ['required','exists:formularios,id'],
+            'rut'              => ['required', new ClRut],        
+            'nombre_completo'  => ['required','string','max:255'],
+            'fecha_nacimiento' => ['required','date'],
+            'sexo'             => ['nullable','in:M,F,U'],
+            'direccion'        => ['required','string','max:255'],
+            'rut_jefe_hogar'   => ['nullable', new ClRut],  
         ]);
 
         $orgId = session('organizacion_id');
@@ -272,10 +272,12 @@ class OrganizacionController extends Controller
             ->first();
 
         if (!$tramo) {
+            $edadAnios = round($edadMeses / 12, 1); 
             return back()->withErrors([
-                'edad' => "No existe un tramo de edad para este beneficiario (edad {$edadMeses} meses al 31/12/{$anioPeriodo})."
+                'edad' => "No existe un tramo de edad para este beneficiario (edad {$edadAnios} años al 31/12/{$anioPeriodo})."
             ])->withInput();
         }
+
 
         \App\Models\Beneficiario::create([
             'rut'              => $rutLimpio,
@@ -333,10 +335,12 @@ class OrganizacionController extends Controller
             ->first();
 
         if (!$tramo) {
+            $edadAnios = round($edadMeses / 12, 1);
             return back()->withErrors([
-                'edad' => "No existe un tramo de edad para este beneficiario (edad {$edadMeses} meses al 31/12/{$anioPeriodo})."
+                'edad' => "No existe un tramo de edad para este beneficiario (edad {$edadAnios} años al 31/12/{$anioPeriodo})."
             ])->withInput();
         }
+
 
         $beneficiario->rut              = $rutLimpio;
         $beneficiario->nombre_completo  = $request->nombre_completo;

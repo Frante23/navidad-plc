@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Support\Rut;
 
 class Beneficiario extends Model
 {
@@ -26,17 +27,24 @@ class Beneficiario extends Model
         'aceptado',
     ];
 
-    public function getRutFormateadoAttribute()
+    public function setRutAttribute($value)
     {
-        $rut = $this->rut;
-        $dv = substr($rut, -1);
-        $num = substr($rut, 0, -1);
-
-        $num = intval($num);
-
-        return number_format($num, 0, '', '.') . '-' . strtoupper($dv);
+        $this->attributes['rut'] = Rut::clean($value);
     }
 
+    public function setRutJefeHogarAttribute($value)
+    {
+        $this->attributes['rut_jefe_hogar'] = Rut::clean($value);
+    }
+    public function getRutFormateadoAttribute()
+    {
+        return Rut::format($this->rut);
+    }
+
+    public function getRutJefeHogarFormateadoAttribute()
+    {
+        return Rut::format($this->rut_jefe_hogar);
+    }
     public function formulario()
     {
         return $this->belongsTo(Formulario::class, 'formulario_id');
@@ -47,12 +55,13 @@ class Beneficiario extends Model
         return $this->belongsTo(Organizacion::class, 'organizacion_id');
     }
 
+    public function tramo()
+    {
+        return $this->belongsTo(TramoEdad::class, 'tramo_id'); 
+    }
+
     public function getEdadAttribute()
     {
         return \Carbon\Carbon::parse($this->fecha_nacimiento)->age;
-    }
-    public function tramo()
-    { 
-        return $this->belongsTo(TramoEdad::class, 'tramo_id'); 
     }
 }

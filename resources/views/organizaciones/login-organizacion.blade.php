@@ -37,7 +37,7 @@
             @if(session('cerrado'))
                 <div class="max-w-lg mx-auto mb-6">
                     <div class="bg-red-500 text-white text-center p-4 rounded-xl shadow-lg">
-                        <h2 class="text-lg font-bold">Inscripción cerrada</h2>
+                        <h2 class="text-lg font-bold">Inscripción/Sesión cerrada</h2>
                         <p class="mt-2 text-sm">{{ session('cerrado') }}</p>
                     </div>
                 </div>
