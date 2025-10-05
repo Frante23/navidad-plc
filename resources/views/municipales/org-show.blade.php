@@ -12,16 +12,18 @@
       </h2>
 
       <div class="flex items-center gap-2">
-        <a href="{{ route('muni.org.export.xlsx', ['id' => $org->id] + request()->only('periodo_id')) }}"
-           class="bg-gray-100 text-gray-800 px-4 py-2 rounded-md ring-1 ring-gray-300 hover:bg-gray-200">
+        <a href="{{ route('muni.org.forms.export.xlsx', ['id' => $org->id] + request()->only('periodo_id')) }}"
+          class="bg-gray-100 text-gray-800 px-4 py-2 rounded-md ring-1 ring-gray-300 hover:bg-gray-200">
           Descargar Excel
         </a>
-        <a href="{{ route('muni.org.export.pdf', ['id' => $org->id] + request()->only('periodo_id')) }}"
-           class="bg-gray-100 text-gray-800 px-4 py-2 rounded-md ring-1 ring-gray-300 hover:bg-gray-200">
+        <a href="{{ route('muni.org.forms.export.pdf', ['id' => $org->id] + request()->only('periodo_id')) }}"
+          class="bg-gray-100 text-gray-800 px-4 py-2 rounded-md ring-1 ring-gray-300 hover:bg-gray-200">
           Descargar PDF
         </a>
       </div>
-    </div>
+    </div>  
+
+
 
     {{-- Filtro por período --}}
     <form method="GET" class="flex items-center gap-2">
@@ -98,6 +100,28 @@
         {{ $formularios->links() }}
       </div>
     </div>
+
+
+    <div class="bg-white rounded-xl shadow p-4">
+      <form method="POST" action="{{ route('muni.org.nota.save', $org->id) }}">
+        @csrf
+        <label class="block text-sm text-gray-700 mb-1">
+          Observación municipal 
+        </label>
+
+        <textarea name="nota_muni" rows="3"
+                  class="w-full border rounded-md px-3 py-2"
+                  placeholder="Notas u observaciones para la organizacion…">{{ old('nota_muni', $org->nota_muni) }}</textarea>
+
+        <div class="mt-2">
+          <button class="bg-blue-600 text-white px-4 py-2 rounded-md">
+            Guardar observación
+          </button>
+        </div>
+      </form>
+    </div>
+
+
 
     <div>
       <a href="{{ route('muni.dashboard', request()->only('periodo_id')) }}"

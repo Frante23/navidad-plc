@@ -1029,9 +1029,89 @@ class DashboardMuniController extends Controller
 
 
 
+    private function buildOrgFormsSummary(int $orgId, ?int $periodoId = null)
+    {
+        return \DB::table('formularios as f')
+            ->leftJoin('periodos as p', 'p.id', '=', 'f.periodo_id')
+            ->leftJoin('beneficiarios as b', 'b.formulario_id', '=', 'f.id')
+            ->join('organizaciones as o', 'o.id', '=', 'f.organizacion_id')
+            ->where('f.organizacion_id', $orgId)
+            ->when($periodoId, fn($q) => $q->where('f.periodo_id', $periodoId))
+            ->selectRaw('
+                f.id,
+                p.anio as periodo,
+                f.estado,
+                COUNT(b.id) as beneficiarios,
+                f.created_at,
+                o.nota_muni
+            ')
+            ->groupBy('f.id','p.anio','f.estado','f.created_at','o.nota_muni')
+            ->orderByDesc('f.id')
+            ->get();
+    }
 
 
 
+    public function exportOrgFormsSummaryXlsx(int $id, \Illuminate\Http\Request $request)
+    {
+        $org = \App\Models\Organizacion::findOrFail($id);
+        $rows = $this->buildOrgFormsSummary($id, $request->integer('periodo_id'));
+
+        $html = view('municipales.exports.forms-summary-xls', [
+            'org'  => $org,
+            'rows' => $rows,
+        ])->render();
+
+        $filename = 'org_'.$id.'_formularios_resumen_'.now()->format('Ymd_His').'.xls';
+
+        return response($html, 200, [
+            'Content-Type'        => 'application/vnd.ms-excel; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"$filename\"",
+        ]);
+    }
+
+
+
+    public function exportOrgFormsSummaryPdf(int $id, \Illuminate\Http\Request $request)
+    {
+        $org  = \App\Models\Organizacion::findOrFail($id);
+        $rows = $this->buildOrgFormsSummary($id, $request->integer('periodo_id'));
+
+        $html = view('municipales.exports.forms-summary-pdf', [
+            'org'  => $org,
+            'rows' => $rows,
+        ])->render();
+
+        $options = new \Dompdf\Options();
+        $options->set('isRemoteEnabled', true);
+        $options->set('defaultFont', 'DejaVu Sans');
+
+        $dompdf = new \Dompdf\Dompdf($options);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4', 'landscape');
+        $dompdf->render();
+
+        $filename = 'org_'.$id.'_formularios_resumen_'.now()->format('Ymd_His').'.pdf';
+
+        return response($dompdf->output(), 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => "attachment; filename=\"$filename\"",
+        ]);
+    }
+
+
+    public function saveNotaMuni(Request $request, int $id)
+    {
+        $data = $request->validate([
+            'nota_muni' => ['nullable','string'],
+        ]);
+
+        $org = \App\Models\Organizacion::findOrFail($id);
+        $org->nota_muni = $data['nota_muni'] ?? null;
+        $org->save();
+
+        return back()->with('status', 'Observación municipal guardada.');
+    }
 
 
     

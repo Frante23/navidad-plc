@@ -22,6 +22,7 @@ class Organizacion extends Model
         'clave',
         'estado',
         'fecha_creacion',  
+        'nota_muni', 
     ];
 
     public function tipo()

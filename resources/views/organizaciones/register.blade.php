@@ -24,6 +24,26 @@
         </ul>
       </div>
     @endif
+    <div class="mb-5 border-2 border-red-300 bg-red-50 text-red-800 rounded-lg p-4">
+      <div class="flex items-start gap-3">
+        <span class="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white text-sm font-bold">!</span>
+        <div>
+          <p class="font-extrabold uppercase tracking-wide">¡Atención! Traer documentos en físico a la Municipalidad</p>
+          <p class="mt-1 text-sm">
+            Para continuar con un <strong>correcto proceso de inscripción</strong>, debes presentar lo siguiente:
+          </p>
+          <div class="mt-3">
+            <p class="font-semibold">Documentación necesaria:</p>
+            <ul class="mt-1 list-disc pl-6 text-sm leading-6">
+              <li>Certificado de Directorio Vigente de la organización.</li>
+              <li>Fotocopia de Cédula de Identidad del/de la Presidente(a) de la organización.</li>
+              <li>Fotocopia del Acta de Reunión donde se indique que se solicitarán los juguetes y la fecha aproximada de entrega.</li>
+              <li>Dos números de contacto telefónicos y dirección especificada para la entrega de los juguetes.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <form method="POST" action="{{ route('organizacion.register.post') }}" class="space-y-4">
       @csrf

@@ -86,4 +86,19 @@ Route::middleware('auth:func')->group(function () {
     )->name('muni.form.ben.bulkSave');
 
 
+
+    Route::get('/muni/organizacion/{id}/forms/export/xlsx',
+        [\App\Http\Controllers\Muni\DashboardMuniController::class, 'exportOrgFormsSummaryXlsx']
+    )->name('muni.org.forms.export.xlsx');
+
+    Route::get('/muni/organizacion/{id}/forms/export/pdf',
+        [\App\Http\Controllers\Muni\DashboardMuniController::class, 'exportOrgFormsSummaryPdf']
+    )->name('muni.org.forms.export.pdf');
+
+    Route::post('/muni/organizacion/{id}/nota-muni', 
+        [\App\Http\Controllers\Muni\DashboardMuniController::class, 'saveNotaMuni']
+    )->name('muni.org.nota.save');
+
+
+
 });
