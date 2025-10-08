@@ -13,6 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
+            'func.admin' => \App\Http\Middleware\EnsureFuncionarioIsAdmin::class,
             'org.auth' => EnsureOrganizationIsAuthenticated::class,
         ]);
     })

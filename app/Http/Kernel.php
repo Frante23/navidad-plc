@@ -1,16 +1,59 @@
 <?php
-namespace App\Http\Middleware;
 
-use Closure;
-use Illuminate\Http\Request;
+namespace App\Http;
 
-class EnsureOrganizationIsAuthenticated
+use Illuminate\Foundation\Http\Kernel as HttpKernel;
+
+class Kernel extends HttpKernel
 {
-    public function handle(Request $request, Closure $next)
-    {
-        if (!$request->session()->get('organizacion_id')) {
-            return redirect('/')->with('status', 'Debes iniciar sesión.');
-        }
-        return $next($request);
-    }
+    /**
+     * The application's global HTTP middleware stack.
+     *
+     * These middleware are run during every request to your application.
+     */
+    protected $middleware = [
+        // middleware globales
+        \Illuminate\Foundation\Http\Middleware\HandlePrecognitiveRequests::class,
+        \Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance::class,
+        \Illuminate\Http\Middleware\HandleCors::class,
+        \Illuminate\Http\Middleware\TrustProxies::class,
+        \Illuminate\Session\Middleware\StartSession::class,
+        \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+        \Illuminate\Foundation\Http\Middleware\ValidatePostSize::class,
+        \Illuminate\Foundation\Http\Middleware\TrimStrings::class,
+        \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
+    ];
+
+    /**
+     * The application's route middleware groups.
+     */
+    protected $middlewareGroups = [
+        'web' => [
+            \App\Http\Middleware\EncryptCookies::class,
+            \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+            \Illuminate\Session\Middleware\StartSession::class,
+            \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+            \App\Http\Middleware\VerifyCsrfToken::class,
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+        ],
+
+        'api' => [
+            \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+        ],
+    ];
+
+    /**
+     * The application's route middleware.
+     *
+     * You may assign middleware to routes using these keys.
+     */
+    protected $routeMiddleware = [
+        'auth' => \App\Http\Middleware\Authenticate::class,
+        'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
+
+        'func.admin' => \App\Http\Middleware\EnsureFuncionarioIsAdmin::class,
+
+        'org.auth' => \App\Http\Middleware\EnsureOrganizationIsAuthenticated::class,
+    ];
 }
