@@ -7,6 +7,8 @@ use App\Http\Middleware\EnsureOrganizationIsAuthenticated as OrgAuth;
 use App\Http\Controllers\Muni\AuthMuniController;
 use App\Http\Controllers\Muni\DashboardMuniController;
 use App\Http\Controllers\Muni\FuncionarioMunicipalController;
+use App\Http\Controllers\Muni\AuditController;
+
 
 
 Route::get('/', [OrganizacionController::class, 'showLoginForm'])->name('organizacion.login.form');
@@ -124,4 +126,6 @@ Route::middleware(['auth:func','func.admin'])->group(function () {
     Route::delete('/municipales/funcionarios/{id}', [FuncionarioMunicipalController::class, 'destroy'])
         ->name('funcionarios.destroy');
 
+
+    Route::get('/muni/auditoria', [AuditController::class, 'index'])->name('muni.auditoria');
 });

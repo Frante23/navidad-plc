@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\FuncionarioMunicipal;
 use Illuminate\Support\Facades\DB;
+use App\Support\Audit; 
 
 class AuthMuniController extends Controller
 {
@@ -22,13 +23,14 @@ class AuthMuniController extends Controller
             'password' => 'required',
         ]);
 
-        // intenta login con guard 'func'
         if (Auth::guard('func')->attempt($cred, $request->boolean('remember'))) {
             $request->session()->regenerate();
 
-            // marca último login
             FuncionarioMunicipal::where('correo', $cred['correo'])
                 ->update(['last_login_at' => now()]);
+
+            $uid = Auth::guard('func')->id();
+            Audit::log($uid !== null ? (int)$uid : null, 'AUTH_LOGIN', 'auth', null, 'Login OK');
 
             return redirect()->route('muni.dashboard');
         }
@@ -38,6 +40,9 @@ class AuthMuniController extends Controller
 
     public function logout(Request $request)
     {
+        $uid = Auth::guard('func')->id();
+        Audit::log($uid !== null ? (int)$uid : null, 'AUTH_LOGOUT', 'auth', null, 'Logout');
+
         Auth::guard('func')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
@@ -45,4 +50,5 @@ class AuthMuniController extends Controller
         return redirect()->route('login.funcionarios')
             ->with('status', 'Sesión finalizada.');
     }
+
 }

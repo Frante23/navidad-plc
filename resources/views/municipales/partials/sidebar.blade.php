@@ -93,6 +93,18 @@
         </svg>
         <span>Nuevo funcionario</span>
       </a>
+
+
+
+      <a href="{{ route('muni.auditoria') }}"
+        class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-50
+                {{ request()->routeIs('muni.auditoria') ? 'bg-gray-100 font-semibold' : '' }}">
+        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                d="M4 7h16M4 12h16M4 17h16"/>
+        </svg>
+        <span>Auditoría</span>
+      </a>
     @endif
 
 

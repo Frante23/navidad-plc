@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\Hash;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\NuevaClaveOrgMail;
+use App\Support\Audit;
+
 
 
 
@@ -110,6 +112,12 @@ class DashboardMuniController extends Controller
             ->groupBy('beneficiarios.organizacion_id')
             ->pluck('c','organizacion_id');
 
+        
+        Audit::log(auth('func')->id(), 'DASHBOARD_VIEW', null, null,
+            'Vio dashboard', $request->only('q','periodo_id','estado','sort','direction')
+        );
+
+
         return view('municipales.dashboard', compact(
             'funcionario','organizaciones','periodos','periodoSel','tramos',
             'formStats','benByTramo','benTotals','q','estadoSel','sort','direction'
@@ -140,6 +148,11 @@ class DashboardMuniController extends Controller
             ->orderByDesc('id')
             ->paginate(15)
             ->appends($request->query());
+        
+        Audit::log(auth('func')->id(), 'ORG_VIEW', 'organizacion', $org->id,
+            'Vio panel de organización #'.$org->id, $request->only('periodo_id')
+        );
+
 
         return view('municipales.org-show', compact(
             'funcionario', 'org', 'periodos', 'periodoSel', 'formularios', 'beneficiarios'
@@ -194,6 +207,11 @@ class DashboardMuniController extends Controller
             'Content-Type'        => 'text/csv; charset=UTF-8',
             'Content-Disposition' => "attachment; filename=\"$filename\"",
         ];
+
+        Audit::log(auth('func')->id(), 'EXPORT_CSV', 'export', null,
+            'Exportó CSV agrupado',
+            $request->only('periodo_id','q')
+        );
 
         return response()->stream(function () use ($rows) {
             $out = fopen('php://output','w');
@@ -311,6 +329,12 @@ class DashboardMuniController extends Controller
             'titulo' => 'Exportación agrupada',
         ])->render();
 
+        Audit::log(auth('func')->id(), 'EXPORT_XLSX', 'export', null,
+            'Exportó XLSX agrupado',
+            $request->only('periodo_id','q')
+        );
+
+
         return response($html, 200, $headers);
     }
 
@@ -332,6 +356,11 @@ class DashboardMuniController extends Controller
         $dompdf->loadHtml($html, 'UTF-8');
         $dompdf->setPaper('A4', 'landscape');
         $dompdf->render();
+        Audit::log(auth('func')->id(), 'EXPORT_PDF', 'export', null,
+            'Exportó PDF agrupado',
+            $request->only('periodo_id','q')
+        );
+
 
         $filename = 'muni_export_'.now()->format('Ymd_His').'.pdf';
         return response($dompdf->output(), 200, [
@@ -358,6 +387,11 @@ class DashboardMuniController extends Controller
                 'titulo' => 'Organización: '.$org->nombre.' ('.$org->personalidad_juridica.')',
             ])->render();
 
+            Audit::log(auth('func')->id(), 'EXPORT_ORG_XLSX', 'organizacion', (int)$id,
+                'Exportó XLSX de organización #'.$id,
+                $request->only('periodo_id')
+            );
+
             return response($html, 200, $headers);
         }
 
@@ -380,6 +414,11 @@ class DashboardMuniController extends Controller
             $dompdf->loadHtml($html, 'UTF-8');
             $dompdf->setPaper('A4', 'landscape');
             $dompdf->render();
+            Audit::log(auth('func')->id(), 'EXPORT_ORG_PDF', 'organizacion', (int)$id,
+                'Exportó PDF de organización #'.$id,
+                $request->only('periodo_id')
+            );
+
 
             $filename = 'org_'.$id.'_export_'.now()->format('Ymd_His').'.pdf';
             return response($dompdf->output(), 200, [
@@ -452,6 +491,10 @@ class DashboardMuniController extends Controller
                     $r->periodo_anio = $form->periodo?->anio;
                     return $r;
                 });
+                Audit::log(auth('func')->id(), 'EXPORT_FORM_XLSX', 'formulario', (int)$id,
+                    'Exportó XLSX del formulario #'.$id
+                );
+
 
             return response()->view('municipales.exports.table-xls', [
                 'rows'   => $rows,
@@ -513,6 +556,11 @@ class DashboardMuniController extends Controller
             $dompdf->setPaper('A4', 'landscape');
             $dompdf->render();
 
+            Audit::log(auth('func')->id(), 'EXPORT_FORM_PDF', 'formulario', (int)$id,
+                'Exportó PDF del formulario #'.$id
+            );
+
+
             return response($dompdf->output(), 200, [
                 'Content-Type'        => 'application/pdf',
                 'Content-Disposition' => 'attachment; filename="formulario_'.$form->id.'.pdf"',
@@ -526,6 +574,7 @@ class DashboardMuniController extends Controller
 
     public function createOrg()
     {
+        Audit::log(auth('func')->id(), 'ORG_CREATE_VIEW', 'organizacion', null, 'Abrió vista crear organización');
         $funcionario = auth('func')->user();
         $tipos = TipoOrganizacion::orderBy('nombre')->get();  
         return view('municipales.org-create', compact('funcionario','tipos'));
@@ -534,27 +583,42 @@ class DashboardMuniController extends Controller
     public function storeOrg(Request $request)
     {
         $data = $request->validate([
-            'tipo_organizacion_id'   => 'required|exists:tipos_organizaciones,id',
-            'nombre'                => 'required|string|max:255',
-            'personalidad_juridica' => 'required|string|max:100',
-            'domicilio_despacho'    => 'required|string|max:255',
-            'email'                 => 'nullable|email|max:255',
-            'nombre_representante'  => 'required|string|max:255',
-            'telefono_contacto'     => 'nullable|string|max:50',
-            'observacion'           => 'nullable|string',
-            'clave'                 => 'required|string|min:6',
-            'estado'                => 'nullable|in:activo,inactivo',   
-            'fecha_creacion'        => 'required|date',                
+            'tipo_organizacion_id' => 'required|exists:tipos_organizaciones,id',
+            'nombre'               => 'required|string|max:255',
+            'personalidad_juridica'=> 'required|string|max:100',
+            'domicilio_despacho'   => 'required|string|max:255',
+            'email'                => 'nullable|email|max:255',
+            'nombre_representante' => 'required|string|max:255',
+            'telefono_contacto'    => 'nullable|string|max:50',
+            'observacion'          => 'nullable|string',
+            'clave'                => 'required|string|min:6',
+            'estado'               => 'nullable|in:activo,inactivo',
+            'fecha_creacion'       => 'required|date',
         ]);
 
         $data['estado'] = $data['estado'] ?? 'activo';
+        $plain = $data['clave'];
+        $data['clave'] = Hash::make($plain);
+    
+        $org = Organizacion::create($data);
+    
+        if (!empty($org->email)) {
+            try {
+                Mail::to($org->email)->send(new NuevaClaveOrgMail($org, $plain));
+            } catch (\Throwable $e) {
+                Log::error('Error enviando correo de nueva clave a organización '.$org->id.': '.$e->getMessage());
+                return redirect()->route('muni.dashboard')
+                    ->with('status', 'Agrupación creada. (⚠️ No se pudo enviar el correo automáticamente, verifique el email o logs).');
+            }
+        }
 
-        $data['clave'] = Hash::make($data['clave']);
-
-        \App\Models\Organizacion::create($data);
-
+        Audit::log(auth('func')->id(), 'ORG_CREATE', 'organizacion', $data['nombre'] ?? null, 
+            'Creó organización «'.$data['nombre'].'»',
+            ['payload'=>$request->except(['clave','_token'])]
+        );
+    
         return redirect()->route('muni.dashboard')
-            ->with('status', 'Agrupación creada correctamente.');
+            ->with('status', 'Agrupación creada correctamente. Se envió la contraseña al correo registrado.');
     }
 
 
@@ -573,6 +637,8 @@ class DashboardMuniController extends Controller
         $inactivas = Organizacion::where('estado','inactivo')
             ->orderBy('updated_at','desc')->paginate(15, ['*'], 'inactivas_page');
 
+        Audit::log(auth('func')->id(), 'ORG_PENDING_VIEW', null, null, 'Vio pendientes/inactivas');
+    
         return view('municipales.org-pendientes', compact('funcionario','pendientes','inactivas'));
     }
 
@@ -592,6 +658,11 @@ class DashboardMuniController extends Controller
         $org->clave  = Hash::make($request->clave);
         $org->save();
 
+        Audit::log(auth('func')->id(), 'ORG_APPROVE', 'organizacion', $org->id,
+            'Aprobó organización «'.$org->nombre.'» (envió clave)',
+            []
+        );
+
         Mail::to($org->email)->send(new NuevaClaveOrgMail($org, $request->clave));
 
         return back()->with('status','Organización aprobada, activada y correo enviado.');
@@ -609,6 +680,10 @@ class DashboardMuniController extends Controller
         $org->clave  = null;
         $org->save();
 
+        Audit::log(auth('func')->id(), 'ORG_REJECT', 'organizacion', $org->id,
+            'Rechazó / movió a inactivas «'.$org->nombre.'»'
+        );
+
         return back()->with('status','Organización movida a inactivas.');
     }
 
@@ -622,6 +697,10 @@ class DashboardMuniController extends Controller
         $org->estado = 'inactivo';
         $org->clave  = null;
         $org->save();
+        Audit::log(auth('func')->id(), 'ORG_DEACTIVATE', 'organizacion', $org->id,
+            'Desactivó organización «'.$org->nombre.'»'
+        );
+
 
         return back()->with('status', 'Organización desactivada y contraseña eliminada.');
     }
@@ -638,6 +717,11 @@ class DashboardMuniController extends Controller
         $org->estado = 'activo';
         $org->clave  = \Illuminate\Support\Facades\Hash::make($plain);
         $org->save();
+
+        Audit::log(auth('func')->id(), 'ORG_REACTIVATE', 'organizacion', $org->id,
+            'Reactivó organización «'.$org->nombre.'» (envió clave)'
+        );
+
 
         Mail::to($org->email)->send(new NuevaClaveOrgMail($org, $request->clave));
 
@@ -661,7 +745,9 @@ class DashboardMuniController extends Controller
         $org->estado = 'activo';
         $org->clave  = \Illuminate\Support\Facades\Hash::make($plain);
         $org->save();
-
+        Audit::log(auth('func')->id(), 'ORG_ACTIVATE_FROM_INACTIVE', 'organizacion', $org->id,
+            'Reactivó desde inactiva «'.$org->nombre.'» (envió clave)'
+        );
         Mail::to($org->email)->send(new NuevaClaveOrgMail($org, $request->clave));
 
         return back()->with('status','Organización reactivada; correo enviado con la nueva contraseña.');
@@ -705,6 +791,10 @@ class DashboardMuniController extends Controller
                 ->paginate(30, ['*'], 'detalle_page')
                 ->withQueryString();
         }
+        Audit::log(auth('func')->id(), 'DUP_VIEW', null, null,
+            'Vio RUT duplicados', $request->only('periodo_id','rut')
+        );
+
 
         return view('municipales.duplicados', compact('funcionario','periodos','periodoSel','agrupado','rutDetalle'));
     }
@@ -722,6 +812,10 @@ class DashboardMuniController extends Controller
         $org = \App\Models\Organizacion::findOrFail($id);
         $org->estado = $request->estado;
         $org->save();
+        Audit::log(auth('func')->id(), 'ORG_STATUS_SET', 'organizacion', $org->id,
+            'Seteó estado «'.$request->estado.'» a «'.$org->nombre.'»'
+        );
+
 
         return back()->with('status', "Estado de «{$org->nombre}» actualizado a {$org->estado}.");
     }
@@ -761,6 +855,11 @@ class DashboardMuniController extends Controller
         }
 
         $ben->save();
+        Audit::log(auth('func')->id(), 'BEN_REVIEW', 'beneficiario', $ben->id,
+            'Revisó beneficiario #'.$ben->id.' (accion='.$accion.')',
+            $request->only('porcentaje_rsh','observaciones')
+        );
+
 
         return back()->with('status', 'Revisión actualizada.');
     }
@@ -785,6 +884,11 @@ class DashboardMuniController extends Controller
             ->appends($request->query());
 
         $backParams = ['id' => $form->organizacion_id] + $request->only('periodo_id');
+
+        Audit::log(auth('func')->id(), 'FORM_BEN_VIEW', 'formulario', $form->id,
+            'Vio beneficiarios del formulario #'.$form->id
+        );
+
 
         return view('municipales.form-beneficiarios', [
             'funcionario'    => $funcionario,
@@ -975,6 +1079,11 @@ class DashboardMuniController extends Controller
 
         $orgsSelect = \App\Models\Organizacion::orderBy('nombre')->get(['id','nombre']);
 
+        Audit::log(auth('func')->id(), 'STATS_VIEW', null, null,
+            'Vio estadísticas', $request->only('periodo_id','org_id')
+        );
+
+
         return view('municipales.estadisticas', compact(
             'funcionario',
             'periodoId','orgId',
@@ -1022,6 +1131,11 @@ class DashboardMuniController extends Controller
             $ben->porcentaje_rsh = $porc;
             $ben->observaciones  = $obs;
             $ben->save();
+            Audit::log(auth('func')->id(), 'BEN_BULK_SAVE', 'formulario', $form->id,
+                'Guardado masivo de beneficiarios del formulario #'.$form->id,
+                ['items_count'=>count($items)]
+            );
+
         }
 
         return back()->with('status', 'Cambios guardados correctamente.');
@@ -1109,6 +1223,11 @@ class DashboardMuniController extends Controller
         $org = \App\Models\Organizacion::findOrFail($id);
         $org->nota_muni = $data['nota_muni'] ?? null;
         $org->save();
+        Audit::log(auth('func')->id(), 'ORG_NOTE_SAVE', 'organizacion', $org->id,
+            'Guardó nota municipal para «'.$org->nombre.'»',
+            ['nota_muni'=>$org->nota_muni]
+        );
+
 
         return back()->with('status', 'Observación municipal guardada.');
     }

@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+use App\Support\Audit;
 
 class FuncionarioMunicipalController extends Controller
 {
@@ -69,12 +71,29 @@ class FuncionarioMunicipalController extends Controller
         ]);
 
         $data['password'] = Hash::make($data['password']);
-        $data['es_admin'] = (bool) ($request->boolean('es_admin'));
+        $data['es_admin'] = $request->boolean('es_admin');
 
-        FuncionarioMunicipal::create($data);
+        $nuevo = FuncionarioMunicipal::create($data);
 
-        return redirect()->route('funcionarios.index')->with('success','Funcionario creado correctamente.');
+        DB::statement(
+            'CALL sp_audit_log(?,?,?,?,?,?,?,?)',
+            [
+                auth('func')->id(),
+                'FUNC_CREATE',
+                'funcionario',
+                $nuevo->id,
+                'Creó funcionario '.$nuevo->nombre_completo.' ('.$nuevo->correo.')',
+                request()->ip(),
+                substr((string)request()->header('User-Agent'),0,255),
+                json_encode(['payload'=>$request->except(['password','_token'])], JSON_UNESCAPED_UNICODE),
+            ]
+        );
+
+
+        return redirect()->route('funcionarios.index')
+            ->with('success','Funcionario creado correctamente.');
     }
+
 
     public function toggleAdmin($id)
     {
@@ -83,9 +102,19 @@ class FuncionarioMunicipalController extends Controller
             return back()->with('error','No puedes cambiar tu propio rol.');
         }
 
-        $f = \App\Models\FuncionarioMunicipal::findOrFail($id);
+        $f = FuncionarioMunicipal::findOrFail($id);
+        $was = (bool)$f->es_admin;
         $f->es_admin = !$f->es_admin;
         $f->save();
+
+        Audit::log(
+            null,
+            $was ? 'FUNC_REVOKE_ADMIN' : 'FUNC_GRANT_ADMIN',
+            'funcionario',
+            $f->id,
+            ($was ? 'Quitó admin a ' : 'Concedió admin a ').$f->nombre_completo.' ('.$f->correo.')',
+            ['before'=>['es_admin'=>$was],'after'=>['es_admin'=>$f->es_admin]]
+        );
 
         return back()->with('success','Rol actualizado.');
     }
@@ -93,15 +122,31 @@ class FuncionarioMunicipalController extends Controller
     public function destroy($id)
     {
         $yo = auth('func')->user();
-
         if ((int)$yo->id === (int)$id) {
             return back()->with('error', 'No puedes eliminar tu propio usuario.');
         }
 
-        $funcionario = \App\Models\FuncionarioMunicipal::findOrFail($id);
-        $funcionario->delete();
+        $f = FuncionarioMunicipal::findOrFail($id);
 
-        return back()->with('success', 'Funcionario eliminado correctamente.');
+        Audit::log(
+            null,
+            'FUNC_DELETE',
+            'funcionario',
+            $f->id,
+            'Eliminó funcionario '.$f->nombre_completo.' ('.$f->correo.')',
+            ['snapshot'=>$f->toArray()]
+        );
+
+        $f->delete();
+
+        return back()->with('success','Funcionario eliminado correctamente.');
     }
+
+
+
+
+
+
+
 
 }
